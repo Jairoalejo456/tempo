@@ -61,8 +61,10 @@ final class AppCoordinator: NSObject {
     /// Abre una captura de ejemplo para poder probar el editor sin necesidad del permiso de
     /// grabación de pantalla. Se activa con `--demo`.
     @MainActor
-    func presentDemoCapture() {
+    func presentDemoCapture(openingEditor: Bool = false) {
         present(capture: SampleRenderer.makeSyntheticCapture(), on: NSScreen.main)
+        guard openingEditor, let session = sessions.last else { return }
+        openEditor(for: session)
     }
 
     // MARK: - Presentación
@@ -265,9 +267,12 @@ final class AppCoordinator: NSObject {
         }
     }
 
-    /// La aplicación sólo aparece en el Dock mientras hay un editor abierto.
-    private func updateActivationPolicy() {
-        let needsRegular = sessions.contains { $0.isEditorVisible }
+    /// La aplicación aparece en el Dock mientras hay un editor abierto, o siempre si el usuario
+    /// lo ha pedido en los ajustes.
+    func updateActivationPolicy() {
+        let needsRegular = Preferences.shared.showsDockIcon
+            || sessions.contains { $0.isEditorVisible }
+            || PreferencesWindowController.isShowing
         let target: NSApplication.ActivationPolicy = needsRegular ? .regular : .accessory
         if NSApp.activationPolicy() != target {
             NSApp.setActivationPolicy(target)

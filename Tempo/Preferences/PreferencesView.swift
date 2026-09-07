@@ -112,6 +112,22 @@ private struct GeneralSettingsView: View {
                     .foregroundStyle(.secondary)
             }
 
+            Divider()
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Presencia en el sistema")
+                    .font(.system(size: 12, weight: .semibold))
+
+                Toggle("Mostrar el icono en el Dock", isOn: $preferences.showsDockIcon)
+
+                Text(preferences.showsDockIcon
+                     ? "Tempo se comporta como una aplicación normal: icono fijo en el Dock y en ⌘⇥."
+                     : "Tempo vive solo en la barra de menús. Aparece en el Dock mientras editas una captura.")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
             Spacer(minLength: 0)
         }
         .frame(maxWidth: .infinity, alignment: .leading)

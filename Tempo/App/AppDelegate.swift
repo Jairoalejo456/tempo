@@ -24,16 +24,46 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Modo demo: abre una captura de ejemplo para probar el editor sin permisos.
         if CommandLine.arguments.contains("--demo") {
+            let opensEditor = CommandLine.arguments.contains("--editor")
             DispatchQueue.main.async {
-                AppCoordinator.shared.presentDemoCapture()
+                AppCoordinator.shared.presentDemoCapture(openingEditor: opensEditor)
             }
             return
         }
+
+        applyDockIconPreference()
 
         // Al arrancar por primera vez se pide el permiso para que el primer atajo ya funcione.
         if !ScreenCaptureService.hasPermission {
             ScreenCaptureService.requestPermission()
         }
+
+        // La primera vez —o si falta el permiso— se muestran los ajustes: al ser una utilidad
+        // de barra de menús, arrancar en silencio no daría ninguna señal de que ya funciona.
+        if Preferences.shared.consumeFirstLaunchFlag() || !ScreenCaptureService.hasPermission {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in
+                self?.showPreferences(nil)
+            }
+        }
+    }
+
+    /// Abrir Tempo desde Spotlight, Launchpad o el Finder cuando ya está en marcha: se muestran
+    /// los ajustes, para que hacer clic en la aplicación tenga una respuesta visible.
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        if !flag {
+            showPreferences(nil)
+        }
+        return true
+    }
+
+    /// El usuario puede elegir en los ajustes si Tempo aparece también en el Dock.
+    private func applyDockIconPreference() {
+        AppCoordinator.shared.updateActivationPolicy()
+        Preferences.shared.$showsDockIcon
+            .dropFirst()
+            .receive(on: RunLoop.main)
+            .sink { _ in AppCoordinator.shared.updateActivationPolicy() }
+            .store(in: &cancellables)
     }
 
     func applicationWillTerminate(_ notification: Notification) {

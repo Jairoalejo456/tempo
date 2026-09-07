@@ -46,10 +46,13 @@ enum ScreenCaptureService {
     // MARK: - Captura
 
     /// Captura completa de la pantalla indicada (por omisión, la que contiene el cursor).
-    static func captureFullScreen(screen: NSScreen? = nil) async throws -> CaptureImage {
+    /// - Parameter includingOwnWindows: sólo para diagnóstico. Normalmente las ventanas de
+    ///   Tempo se excluyen para que la miniatura no aparezca dentro de la propia captura.
+    static func captureFullScreen(screen: NSScreen? = nil,
+                                  includingOwnWindows: Bool = false) async throws -> CaptureImage {
         let target = screen ?? screenUnderCursor()
         guard let target else { throw CaptureError.displayNotFound }
-        return try await capture(screen: target, regionInScreen: nil)
+        return try await capture(screen: target, regionInScreen: nil, includingOwnWindows: includingOwnWindows)
     }
 
     /// Captura una región concreta.
@@ -63,7 +66,9 @@ enum ScreenCaptureService {
 
     // MARK: - Implementación
 
-    private static func capture(screen: NSScreen, regionInScreen rect: CGRect?) async throws -> CaptureImage {
+    private static func capture(screen: NSScreen,
+                                regionInScreen rect: CGRect?,
+                                includingOwnWindows: Bool = false) async throws -> CaptureImage {
         guard hasPermission else { throw CaptureError.permissionDenied }
         guard let displayID = screen.displayID else { throw CaptureError.displayNotFound }
 
@@ -81,7 +86,9 @@ enum ScreenCaptureService {
 
         // Excluir la propia aplicación: sus ventanas flotantes nunca deben salir en la captura.
         let ownBundleID = Bundle.main.bundleIdentifier
-        let ownApplications = content.applications.filter { $0.bundleIdentifier == ownBundleID }
+        let ownApplications = includingOwnWindows
+            ? []
+            : content.applications.filter { $0.bundleIdentifier == ownBundleID }
         let filter = SCContentFilter(display: display, excludingApplications: ownApplications, exceptingWindows: [])
 
         let scale = screen.backingScaleFactor

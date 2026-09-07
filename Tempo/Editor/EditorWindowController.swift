@@ -34,7 +34,7 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSMenu
         window.title = "Captura"
         window.titlebarAppearsTransparent = false
         window.isReleasedWhenClosed = false
-        window.minSize = NSSize(width: 520, height: 260)
+        window.minSize = NSSize(width: 720, height: 300)
         window.tabbingMode = .disallowed
 
         super.init(window: window)
@@ -101,7 +101,7 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSMenu
         let maxHeight = visible.height * 0.9 - chrome
 
         let scale = min(maxWidth / image.width, (maxHeight - toolbarHeight) / image.height, 1)
-        return CGSize(width: max(560, (image.width * scale).rounded() + 32),
+        return CGSize(width: max(760, (image.width * scale).rounded() + 32),
                       height: max(320, (image.height * scale).rounded() + toolbarHeight + 32))
     }
 

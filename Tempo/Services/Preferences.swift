@@ -38,6 +38,8 @@ final class Preferences: ObservableObject {
         static let regionShortcut = "shortcut.region"
         static let saveMode = "save.mode"
         static let saveFolder = "save.folder"
+        static let showsDockIcon = "appearance.showsDockIcon"
+        static let hasLaunchedBefore = "app.hasLaunchedBefore"
     }
 
     private let defaults: UserDefaults
@@ -61,6 +63,12 @@ final class Preferences: ObservableObject {
         didSet { defaults.set(saveFolder.path, forKey: Key.saveFolder) }
     }
 
+    /// Si está activo, Tempo se comporta como una aplicación normal: icono permanente en el
+    /// Dock y en el conmutador de aplicaciones. Desactivado, vive solo en la barra de menús.
+    @Published var showsDockIcon: Bool {
+        didSet { defaults.set(showsDockIcon, forKey: Key.showsDockIcon) }
+    }
+
     // MARK: - Ciclo de vida
 
     init(defaults: UserDefaults = .standard) {
@@ -69,12 +77,21 @@ final class Preferences: ObservableObject {
         fullScreenShortcut = Preferences.load(from: defaults, key: Key.fullScreenShortcut) ?? .defaultFullScreen
         regionShortcut = Preferences.load(from: defaults, key: Key.regionShortcut) ?? .defaultRegion
         saveMode = (defaults.string(forKey: Key.saveMode).flatMap(SaveMode.init(rawValue:))) ?? .ask
+        showsDockIcon = defaults.bool(forKey: Key.showsDockIcon)
 
         if let path = defaults.string(forKey: Key.saveFolder) {
             saveFolder = URL(fileURLWithPath: path, isDirectory: true)
         } else {
             saveFolder = Preferences.defaultSaveFolder
         }
+    }
+
+    /// `true` sólo la primera vez que se abre la aplicación en este Mac. Se usa para enseñar
+    /// los ajustes en el primer arranque, en lugar de dejar al usuario sin ninguna señal.
+    func consumeFirstLaunchFlag() -> Bool {
+        guard !defaults.bool(forKey: Key.hasLaunchedBefore) else { return false }
+        defaults.set(true, forKey: Key.hasLaunchedBefore)
+        return true
     }
 
     static var defaultSaveFolder: URL {

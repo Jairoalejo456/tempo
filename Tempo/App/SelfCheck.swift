@@ -9,15 +9,25 @@ import Foundation
 enum SelfCheck {
 
     private static var failures = 0
+    private static var transcript: [String] = []
+    private static var reportURL: URL?
 
-    static func run() -> Never {
-        print("Tempo · comprobación del flujo real\n")
+    /// - Parameter reportPath: si se indica, el informe también se escribe ahí.
+    ///
+    /// Hace falta porque macOS atribuye los permisos de privacidad al proceso que lanza la
+    /// aplicación: ejecutar el binario desde una terminal hereda los permisos de la terminal,
+    /// no los de Tempo. Lanzándola con `open` y volcando el informe a un archivo se comprueba
+    /// el permiso real de la aplicación.
+    static func run(reportPath: String? = nil) -> Never {
+        reportURL = reportPath.map { URL(fileURLWithPath: ($0 as NSString).expandingTildeInPath) }
+        emit("Tempo · comprobación del flujo real")
+        emit("")
 
         guard ScreenCaptureService.hasPermission else {
-            print("✗ Permiso de Grabación de pantalla NO concedido.")
-            print("  Actívalo en Ajustes del Sistema › Privacidad y seguridad › Grabación de pantalla")
-            print("  y vuelve a ejecutar esta comprobación.")
-            exit(2)
+            emit("✗ Permiso de Grabación de pantalla NO concedido.")
+            emit("  Actívalo en Ajustes del Sistema › Privacidad y seguridad › Grabación de pantalla")
+            emit("  y vuelve a ejecutar esta comprobación.")
+            finish(code: 2)
         }
         report(true, "Permiso de Grabación de pantalla concedido")
 
@@ -28,14 +38,27 @@ enum SelfCheck {
         }
         semaphore.wait()
 
-        print("")
+        emit("")
         if failures == 0 {
-            print("Todas las comprobaciones pasaron.")
-            exit(0)
+            emit("Todas las comprobaciones pasaron.")
+            finish(code: 0)
         } else {
-            print("\(failures) comprobación(es) fallaron.")
-            exit(1)
+            emit("\(failures) comprobación(es) fallaron.")
+            finish(code: 1)
         }
+    }
+
+    private static func emit(_ line: String) {
+        print(line)
+        transcript.append(line)
+    }
+
+    private static func finish(code: Int32) -> Never {
+        if let reportURL {
+            try? transcript.joined(separator: "\n").appending("\n")
+                .write(to: reportURL, atomically: true, encoding: .utf8)
+        }
+        exit(code)
     }
 
     private static func runChecks() async {
@@ -155,7 +178,7 @@ enum SelfCheck {
             let reloaded = NSImage(contentsOf: url)
             let bytes = (try? FileManager.default.attributesOfItem(atPath: url.path))?[.size] as? Int ?? 0
             report(reloaded != nil, "Archivo PNG escrito y legible (\(bytes / 1024) KB)")
-            print("   → \(url.path)")
+            emit("   → \(url.path)")
         } catch {
             report(false, "Guardar en disco: \(error.localizedDescription)")
         }
@@ -165,10 +188,37 @@ enum SelfCheck {
             let dragURL = try ImageExporter.writeTemporaryFile(image: composed, date: Date())
             report(FileManager.default.fileExists(atPath: dragURL.path),
                    "Archivo preparado para arrastrar a otra aplicación")
-            print("   → \(dragURL.path)")
+            emit("   → \(dragURL.path)")
         } catch {
             report(false, "Preparar archivo para arrastrar: \(error.localizedDescription)")
         }
+    }
+
+    /// Guarda una captura de la pantalla en `path`. Sirve para revisar la propia interfaz de
+    /// Tempo durante el desarrollo: la aplicación es la única con permiso de grabación, así que
+    /// una herramienta de línea de órdenes externa no podría hacerlo.
+    static func captureScreen(to path: String, includingOwnWindows: Bool = false) -> Never {
+        guard ScreenCaptureService.hasPermission else {
+            print("Falta el permiso de Grabación de pantalla.")
+            exit(2)
+        }
+        let semaphore = DispatchSemaphore(value: 0)
+        var exitCode: Int32 = 1
+        Task {
+            defer { semaphore.signal() }
+            do {
+                let capture = try await ScreenCaptureService.captureFullScreen(includingOwnWindows: includingOwnWindows)
+                let image = try ImageExporter.compose(capture: capture, annotations: [])
+                let url = URL(fileURLWithPath: (path as NSString).expandingTildeInPath)
+                try ImageExporter.write(image: image, to: url)
+                print("Captura guardada en \(url.path) (\(image.width)×\(image.height) px)")
+                exitCode = 0
+            } catch {
+                print("No se pudo capturar: \(error.localizedDescription)")
+            }
+        }
+        semaphore.wait()
+        exit(exitCode)
     }
 
     private static func identical(_ a: CGImage, _ b: CGImage) -> Bool {
@@ -178,6 +228,6 @@ enum SelfCheck {
 
     private static func report(_ success: Bool, _ message: String) {
         if !success { failures += 1 }
-        print("\(success ? "✓" : "✗") \(message)")
+        emit("\(success ? "✓" : "✗") \(message)")
     }
 }

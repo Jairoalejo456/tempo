@@ -108,6 +108,33 @@ final class SettingsTests: XCTestCase {
         XCTAssertFalse(preferences.saveFolderExists, "Si la carpeta desapareció, los ajustes lo advierten")
     }
 
+    // MARK: - Presencia en el sistema
+
+    func testDockIconIsOffByDefault() throws {
+        let (preferences, _, suite) = try makeIsolatedPreferences()
+        defer { UserDefaults.standard.removePersistentDomain(forName: suite) }
+        XCTAssertFalse(preferences.showsDockIcon,
+                       "Por omisión Tempo es una utilidad de barra de menús")
+    }
+
+    func testDockIconPreferencePersists() throws {
+        let (preferences, defaults, suite) = try makeIsolatedPreferences()
+        defer { UserDefaults.standard.removePersistentDomain(forName: suite) }
+
+        preferences.showsDockIcon = true
+        XCTAssertTrue(Preferences(defaults: defaults).showsDockIcon)
+    }
+
+    func testFirstLaunchFlagIsConsumedOnce() throws {
+        let (preferences, defaults, suite) = try makeIsolatedPreferences()
+        defer { UserDefaults.standard.removePersistentDomain(forName: suite) }
+
+        XCTAssertTrue(preferences.consumeFirstLaunchFlag(), "La primera vez sí")
+        XCTAssertFalse(preferences.consumeFirstLaunchFlag(), "La segunda ya no")
+        XCTAssertFalse(Preferences(defaults: defaults).consumeFirstLaunchFlag(),
+                       "Tampoco en arranques posteriores")
+    }
+
     // MARK: - Guardado directo
 
     func testAvailableURLNeverOverwrites() throws {

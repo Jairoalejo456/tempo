@@ -2,7 +2,11 @@ import AppKit
 import SwiftUI
 
 /// Ventana de ajustes de la aplicación.
-final class PreferencesWindowController: NSWindowController {
+final class PreferencesWindowController: NSWindowController, NSWindowDelegate {
+
+    /// Mientras los ajustes están abiertos, Tempo se comporta como una aplicación normal
+    /// (aparece en el Dock) aunque no haya ningún editor.
+    private(set) static var isShowing = false
 
     private var selection: PreferencesTab = .general {
         didSet { rebuild() }
@@ -17,6 +21,7 @@ final class PreferencesWindowController: NSWindowController {
         window.isReleasedWhenClosed = false
         window.center()
         super.init(window: window)
+        window.delegate = self
         rebuild()
     }
 
@@ -44,9 +49,19 @@ final class PreferencesWindowController: NSWindowController {
 
     func present() {
         // Los ajustes son una ventana normal: la aplicación pasa al primer plano mientras tanto.
+        PreferencesWindowController.isShowing = true
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
         window?.makeKeyAndOrderFront(nil)
+    }
+
+    func windowWillClose(_ notification: Notification) {
+        PreferencesWindowController.isShowing = false
+        // Al cerrar, la aplicación vuelve a la barra de menús salvo que el usuario haya pedido
+        // mantener el icono en el Dock.
+        DispatchQueue.main.async {
+            AppCoordinator.shared.updateActivationPolicy()
+        }
     }
 
     func select(tab: PreferencesTab) {

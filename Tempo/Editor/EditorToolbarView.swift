@@ -161,17 +161,11 @@ struct EditorToolbarView: View {
 
     private var actionGroup: some View {
         HStack(spacing: 8) {
-            Button(action: onCopy) {
-                Label("Copiar", systemImage: "doc.on.doc")
-            }
-            .help("Copiar la imagen con anotaciones · ⌘C")
-
-            Button(action: onSave) {
-                Label("Guardar", systemImage: "square.and.arrow.down")
-            }
-            .help("Guardar como PNG · ⌘S")
+            ActionButton(symbol: "doc.on.doc", title: "Copiar", shortcut: "⌘C",
+                         help: "Copiar la imagen con anotaciones · ⌘C", action: onCopy)
+            ActionButton(symbol: "square.and.arrow.down", title: "Guardar", shortcut: "⌘S",
+                         help: "Guardar como PNG · ⌘S", action: onSave)
         }
-        .controlSize(.regular)
     }
 
     private var helpButton: some View {
@@ -233,6 +227,39 @@ private struct ToolButton: View {
         }
         .buttonStyle(.plain)
         .help(help)
+    }
+}
+
+/// Botón de salida: icono, texto y atajo siempre visibles, para que se aprenda sin buscarlo.
+private struct ActionButton: View {
+    let symbol: String
+    let title: String
+    let shortcut: String
+    let help: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 5) {
+                Image(systemName: symbol)
+                    .font(.system(size: 12, weight: .medium))
+                Text(title)
+                    .font(.system(size: 12))
+                Text(shortcut)
+                    .font(.system(size: 10, weight: .medium, design: .rounded))
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 9)
+            .padding(.vertical, 5)
+            .background(
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(Color.primary.opacity(0.07))
+            )
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help(help)
+        .fixedSize()
     }
 }
 

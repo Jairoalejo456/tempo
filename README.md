@@ -49,8 +49,10 @@ open ~/Library/Developer/Xcode/DerivedData/Tempo-*/Build/Products/Release/Tempo.
 
 O simplemente abre `Tempo.xcodeproj` en Xcode y pulsa ⌘R.
 
-Para dejarla instalada de forma permanente, copia el `.app` a `/Applications` y añádela a
-**Ajustes del Sistema › General › Ítems de inicio** si quieres que arranque con el Mac.
+Copia el `.app` a `/Applications` y añádela a **Ajustes del Sistema › General › Ítems de
+inicio** si quieres que arranque con el Mac. Instalarla ahí importa: macOS liga el permiso de
+grabación de pantalla a la ruta y a la identidad de la app, así que ejecutarla desde la carpeta
+de compilación obligaría a reconceder el permiso más a menudo.
 
 ### Icono
 
@@ -101,7 +103,7 @@ sistema entrega directamente a la aplicación.
 Puedes comprobar el estado desde el menú de la barra superior, o ejecutando:
 
 ```bash
-/ruta/a/Tempo.app/Contents/MacOS/Tempo --self-check
+open -n /Applications/Tempo.app --args --self-check ~/Desktop/informe.txt
 ```
 
 ---
@@ -178,6 +180,11 @@ Se abren con `⌘,` o desde el menú de la barra superior.
 - **Atajos** — los dos atajos globales, editables, más la lista de atajos del editor.
 - **Acerca de** — versión y compilación, y acceso directo a los ajustes de privacidad de macOS.
 
+Tempo vive en la barra de menús, pero es una aplicación normal: aparece en Spotlight, en
+Launchpad y en la carpeta Aplicaciones. Al abrirla desde ahí estando ya en marcha, muestra los
+ajustes, para que hacer clic tenga una respuesta visible. Si prefieres que además ocupe sitio
+en el Dock de forma permanente, actívalo en **Ajustes › General › Mostrar el icono en el Dock**.
+
 ## Herramientas del editor
 
 - **Flecha**, **rectángulo**, **elipse** y **lápiz** con color y grosor configurables.
@@ -244,8 +251,12 @@ de coordenadas entre AppKit y ScreenCaptureKit, y la salida a portapapeles y dis
 Para comprobar el camino real —captura de pantalla incluida— en este Mac:
 
 ```bash
-/ruta/a/Tempo.app/Contents/MacOS/Tempo --self-check
+open -n /Applications/Tempo.app --args --self-check ~/Desktop/informe.txt
 ```
+
+Conviene lanzarlo con `open` y volcar el informe a un archivo: macOS atribuye los permisos de
+privacidad al proceso que lanza la aplicación, así que ejecutar el binario directamente desde
+una terminal heredaría los permisos de la terminal y daría un falso negativo.
 
 Comprueba el permiso, hace una captura completa y una de región, aplica las siete herramientas,
 verifica la numeración de contadores y el historial, compone a resolución nativa, copia al
@@ -254,8 +265,19 @@ portapapeles y escribe un PNG en disco.
 Para probar el editor completo sin conceder ningún permiso, con una captura de ejemplo:
 
 ```bash
-open -a /ruta/a/Tempo.app --args --demo
+open -n /Applications/Tempo.app --args --demo          # miniatura flotante
+open -n /Applications/Tempo.app --args --demo --editor # y además el editor
 ```
+
+Para capturar la pantalla desde la propia aplicación (útil para revisar su interfaz, ya que
+sólo Tempo tiene el permiso de grabación):
+
+```bash
+open -n /Applications/Tempo.app --args --screenshot ~/Desktop/captura.png [--include-self]
+```
+
+`--include-self` desactiva la exclusión de las ventanas de Tempo, que en uso normal impide que
+la miniatura salga dentro de tus propias capturas.
 
 Y para revisar de un vistazo cómo se dibuja cada herramienta, sin necesidad de capturar nada:
 
