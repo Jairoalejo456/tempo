@@ -18,17 +18,17 @@ enum MainMenu {
         return main
     }
 
-    // MARK: - Snapper
+    // MARK: - Tempo
 
     private static func applicationMenuItem() -> NSMenuItem {
         let item = NSMenuItem()
-        let menu = NSMenu(title: "Snapper")
+        let menu = NSMenu(title: "Tempo")
 
-        menu.addItem(withTitle: "Acerca de Snapper", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
+        menu.addItem(withTitle: "Acerca de Tempo", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
         menu.addItem(.separator())
-        menu.addItem(withTitle: "Ocultar Snapper", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
+        menu.addItem(withTitle: "Ocultar Tempo", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
         menu.addItem(.separator())
-        menu.addItem(withTitle: "Salir de Snapper", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        menu.addItem(withTitle: "Salir de Tempo", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
 
         item.submenu = menu
         return item

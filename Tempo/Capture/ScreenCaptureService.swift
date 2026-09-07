@@ -18,7 +18,7 @@ enum ScreenCaptureService {
         var errorDescription: String? {
             switch self {
             case .permissionDenied:
-                return "Snapper necesita permiso de Grabación de pantalla en Ajustes del Sistema › Privacidad y seguridad."
+                return "Tempo necesita permiso de Grabación de pantalla en Ajustes del Sistema › Privacidad y seguridad."
             case .displayNotFound:
                 return "No se encontró la pantalla que se quería capturar."
             case .emptyRegion:

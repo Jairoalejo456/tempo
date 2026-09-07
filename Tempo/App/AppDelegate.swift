@@ -39,7 +39,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func setUpStatusItem() {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        item.button?.image = NSImage(systemSymbolName: "camera.viewfinder", accessibilityDescription: "Snapper")
+        item.button?.image = NSImage(systemSymbolName: "camera.viewfinder", accessibilityDescription: "Tempo")
         item.button?.image?.isTemplate = true
 
         let menu = NSMenu()
@@ -65,7 +65,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                                       keyEquivalent: "")
         permission.target = self
 
-        let about = menu.addItem(withTitle: "Acerca de Snapper", action: #selector(showAbout(_:)), keyEquivalent: "")
+        let about = menu.addItem(withTitle: "Acerca de Tempo", action: #selector(showAbout(_:)), keyEquivalent: "")
         about.target = self
 
         menu.addItem(.separator())
@@ -86,7 +86,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         if !full || !region {
-            NSLog("[Snapper] Alguno de los atajos globales no pudo registrarse; puede estar ocupado por otra aplicación.")
+            NSLog("[Tempo] Alguno de los atajos globales no pudo registrarse; puede estar ocupado por otra aplicación.")
         }
     }
 

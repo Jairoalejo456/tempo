@@ -3,7 +3,7 @@
 #
 #   ./Tools/make-appicon.sh ruta/a/logo-1024.png
 #
-# Escribe los PNG dentro de Snapper/Resources/Assets.xcassets/AppIcon.appiconset
+# Escribe los PNG dentro de Tempo/Resources/Assets.xcassets/AppIcon.appiconset
 # y actualiza su Contents.json. Después basta con recompilar.
 
 set -euo pipefail
@@ -20,7 +20,7 @@ if [ ! -f "$SOURCE" ]; then
 fi
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-SET="$ROOT/Snapper/Resources/Assets.xcassets/AppIcon.appiconset"
+SET="$ROOT/Tempo/Resources/Assets.xcassets/AppIcon.appiconset"
 mkdir -p "$SET"
 
 # (tamaño en puntos, escala) -> píxeles
@@ -47,4 +47,4 @@ printf "{\n  \"images\" : [\n${JSON_IMAGES}\n  ],\n  \"info\" : {\n    \"author\
 
 echo ""
 echo "Iconos generados en $SET"
-echo "Recompila la app para verlos: xcodebuild -project Snapper.xcodeproj -scheme Snapper build"
+echo "Recompila la app para verlos: xcodebuild -project Tempo.xcodeproj -scheme Tempo build"

@@ -97,7 +97,7 @@ enum ImageExporter {
 
     /// Carpeta propia dentro del directorio temporal del sistema. Las capturas nunca salen del Mac.
     static var dragFolder: URL {
-        let base = FileManager.default.temporaryDirectory.appendingPathComponent("Snapper", isDirectory: true)
+        let base = FileManager.default.temporaryDirectory.appendingPathComponent("Tempo", isDirectory: true)
         try? FileManager.default.createDirectory(at: base, withIntermediateDirectories: true)
         return base
     }

@@ -1,6 +1,6 @@
 import AppKit
 import XCTest
-@testable import Snapper
+@testable import Tempo
 
 /// Comprueba que cada herramienta pinta realmente sobre la imagen y que la exportación
 /// conserva la resolución nativa (Retina).

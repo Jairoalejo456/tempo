@@ -1,7 +1,7 @@
 import AppKit
 import Foundation
 
-/// Comprobación de extremo a extremo que se ejecuta con `Snapper.app --self-check`.
+/// Comprobación de extremo a extremo que se ejecuta con `Tempo.app --self-check`.
 ///
 /// Ejercita el camino real (ScreenCaptureKit, composición, portapapeles y escritura en disco)
 /// sin necesidad de interacción, para poder verificar la instalación en este Mac. No forma
@@ -11,7 +11,7 @@ enum SelfCheck {
     private static var failures = 0
 
     static func run() -> Never {
-        print("Snapper · comprobación del flujo real\n")
+        print("Tempo · comprobación del flujo real\n")
 
         guard ScreenCaptureService.hasPermission else {
             print("✗ Permiso de Grabación de pantalla NO concedido.")
@@ -149,7 +149,7 @@ enum SelfCheck {
 
         // 7. Escritura en disco (lo mismo que hace el panel de guardar tras elegir destino).
         let url = FileManager.default.temporaryDirectory
-            .appendingPathComponent("snapper-selfcheck-\(UUID().uuidString).png")
+            .appendingPathComponent("tempo-selfcheck-\(UUID().uuidString).png")
         do {
             try ImageExporter.write(image: composed, to: url)
             let reloaded = NSImage(contentsOf: url)

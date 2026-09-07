@@ -258,7 +258,7 @@ final class AppCoordinator: NSObject {
         let alert = NSAlert()
         alert.messageText = "Falta el permiso de Grabación de pantalla"
         alert.informativeText = """
-        Para capturar la pantalla, activa Snapper en:
+        Para capturar la pantalla, activa Tempo en:
         Ajustes del Sistema › Privacidad y seguridad › Grabación de pantalla.
 
         Tras concederlo, vuelve a intentar la captura.
@@ -274,7 +274,7 @@ final class AppCoordinator: NSObject {
     }
 
     private func report(_ error: Error) {
-        NSLog("[Snapper] Error: \(error.localizedDescription)")
+        NSLog("[Tempo] Error: \(error.localizedDescription)")
         NSApp.activate(ignoringOtherApps: true)
         let alert = NSAlert()
         alert.messageText = "No se pudo completar la captura"
@@ -323,7 +323,7 @@ extension AppCoordinator: ThumbnailWindowDelegate {
             session.dragFileAnnotations = session.document.annotations
             return url
         } catch {
-            NSLog("[Snapper] No se pudo preparar el archivo para arrastrar: \(error.localizedDescription)")
+            NSLog("[Tempo] No se pudo preparar el archivo para arrastrar: \(error.localizedDescription)")
             return nil
         }
     }

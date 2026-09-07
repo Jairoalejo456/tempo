@@ -1,0 +1,23 @@
+// Ajustes de firma.
+//
+// Por omisión el proyecto se firma de forma ad-hoc: basta para compilar y ejecutar Tempo en
+// tu propio Mac sin ninguna cuenta de desarrollador.
+//
+// Recomendado: crea `Config/Local.xcconfig` (está ignorado por git) con tu identidad:
+//
+//     CODE_SIGN_IDENTITY = Apple Development
+//     DEVELOPMENT_TEAM = TU_TEAM_ID
+//
+// Tu Team ID es el campo OU del certificado; puedes verlo con:
+//
+//     security find-certificate -c "Apple Development" -p | openssl x509 -noout -subject
+//
+// Firmar con una identidad real importa: macOS asocia el permiso de grabación de pantalla a
+// la identidad de la app, así que no tendrás que volver a concederlo en cada recompilación.
+
+CODE_SIGN_STYLE = Manual
+CODE_SIGN_IDENTITY = -
+DEVELOPMENT_TEAM =
+PROVISIONING_PROFILE_SPECIFIER =
+
+#include? "Local.xcconfig"

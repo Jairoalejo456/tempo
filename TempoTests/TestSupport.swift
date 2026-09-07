@@ -1,7 +1,7 @@
 import AppKit
 import CoreGraphics
 import XCTest
-@testable import Snapper
+@testable import Tempo
 
 enum TestSupport {
 

@@ -1,6 +1,6 @@
 import AppKit
 import XCTest
-@testable import Snapper
+@testable import Tempo
 
 /// Salida: portapapeles, archivo en disco y archivo temporal para arrastrar.
 final class ExportTests: XCTestCase {
@@ -40,7 +40,7 @@ final class ExportTests: XCTestCase {
         let capture = TestSupport.makeCapture(logicalWidth: 60, logicalHeight: 40, scale: 2)
         let composed = try ImageExporter.compose(capture: capture, annotations: [])
         let url = FileManager.default.temporaryDirectory
-            .appendingPathComponent("snapper-test-\(UUID().uuidString).png")
+            .appendingPathComponent("tempo-test-\(UUID().uuidString).png")
         defer { try? FileManager.default.removeItem(at: url) }
 
         try ImageExporter.write(image: composed, to: url)

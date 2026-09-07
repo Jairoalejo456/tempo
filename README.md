@@ -1,4 +1,4 @@
-# Snapper
+# Tempo
 
 Utilidad de captura de pantalla para macOS pensada para un flujo concreto: **capturar, anotar
 rápido y arrastrar la imagen a un chat de IA** (ChatGPT, Claude, o cualquier otra aplicación
@@ -42,12 +42,12 @@ Puedes tener varias capturas vivas a la vez: las miniaturas se apilan en la esqu
 
 ```bash
 git clone <este-repositorio>
-cd Snapper
-xcodebuild -project Snapper.xcodeproj -scheme Snapper -configuration Release build
-open ~/Library/Developer/Xcode/DerivedData/Snapper-*/Build/Products/Release/Snapper.app
+cd Tempo
+xcodebuild -project Tempo.xcodeproj -scheme Tempo -configuration Release build
+open ~/Library/Developer/Xcode/DerivedData/Tempo-*/Build/Products/Release/Tempo.app
 ```
 
-O simplemente abre `Snapper.xcodeproj` en Xcode y pulsa ⌘R.
+O simplemente abre `Tempo.xcodeproj` en Xcode y pulsa ⌘R.
 
 Para dejarla instalada de forma permanente, copia el `.app` a `/Applications` y añádela a
 **Ajustes del Sistema › General › Ítems de inicio** si quieres que arranque con el Mac.
@@ -56,7 +56,7 @@ Para dejarla instalada de forma permanente, copia el `.app` a `/Applications` y 
 
 El proyecto está configurado con `DEVELOPMENT_TEAM = TU_TEAM_ID` y firma manual. Si compilas
 con otra cuenta de desarrollador, cambia ese valor en los ajustes del target (o en
-`Snapper.xcodeproj/project.pbxproj`).
+`Tempo.xcodeproj/project.pbxproj`).
 
 Firmar con un certificado de desarrollo real —en lugar de firma ad‑hoc— importa aquí: macOS
 asocia el permiso de grabación de pantalla a la identidad de la app, así que **no tendrás que
@@ -66,9 +66,9 @@ volver a concederlo cada vez que recompiles**.
 
 ## Permisos de macOS
 
-Snapper necesita **Grabación de pantalla**:
+Tempo necesita **Grabación de pantalla**:
 
-> Ajustes del Sistema › Privacidad y seguridad › Grabación de pantalla → activar *Snapper*
+> Ajustes del Sistema › Privacidad y seguridad › Grabación de pantalla → activar *Tempo*
 
 La primera vez que arranca, la app lo solicita automáticamente. Si lo concedes con la app ya
 abierta, **ciérrala y vuelve a abrirla** para que el sistema aplique el cambio.
@@ -79,7 +79,7 @@ sistema entrega directamente a la aplicación.
 Puedes comprobar el estado desde el menú de la barra superior, o ejecutando:
 
 ```bash
-/ruta/a/Snapper.app/Contents/MacOS/Snapper --self-check
+/ruta/a/Tempo.app/Contents/MacOS/Tempo --self-check
 ```
 
 ---
@@ -144,7 +144,7 @@ intacta y disponible.
 ## Estructura del proyecto
 
 ```
-Snapper/
+Tempo/
 ├── App/          Ciclo de vida, menús, coordinación del flujo y sesiones de captura
 ├── Capture/      ScreenCaptureKit y capa de selección de región
 ├── Models/       Anotaciones, colores, imagen capturada y estado del editor (undo/redo)
@@ -152,7 +152,7 @@ Snapper/
 ├── Thumbnail/    Panel flotante y arrastre a otras aplicaciones
 ├── Services/     Atajos globales, exportación (portapapeles/disco) y avisos
 └── Resources/    Catálogo de recursos e icono de la app
-SnapperTests/     Pruebas del núcleo (42 pruebas)
+TempoTests/     Pruebas del núcleo (42 pruebas)
 Tools/            Utilidades de desarrollo
 ```
 
@@ -178,7 +178,7 @@ Tools/            Utilidades de desarrollo
 ## Pruebas
 
 ```bash
-xcodebuild -project Snapper.xcodeproj -scheme Snapper test
+xcodebuild -project Tempo.xcodeproj -scheme Tempo test
 ```
 
 Cubren el estado del editor (historial, numeración automática, descarte de gestos vacíos), el
@@ -188,7 +188,7 @@ de coordenadas entre AppKit y ScreenCaptureKit, y la salida a portapapeles y dis
 Para comprobar el camino real —captura de pantalla incluida— en este Mac:
 
 ```bash
-/ruta/a/Snapper.app/Contents/MacOS/Snapper --self-check
+/ruta/a/Tempo.app/Contents/MacOS/Tempo --self-check
 ```
 
 Comprueba el permiso, hace una captura completa y una de región, aplica las siete herramientas,
@@ -198,7 +198,7 @@ portapapeles y escribe un PNG en disco.
 Y para revisar de un vistazo cómo se dibuja cada herramienta, sin necesidad de capturar nada:
 
 ```bash
-/ruta/a/Snapper.app/Contents/MacOS/Snapper --render-sample ~/Desktop/muestra.png
+/ruta/a/Tempo.app/Contents/MacOS/Tempo --render-sample ~/Desktop/muestra.png
 ```
 
 ---
@@ -216,5 +216,5 @@ captura y al arrancar la aplicación.
 - No hay zoom ni desplazamiento en el editor; la captura se ajusta a la ventana.
 - No hay captura de ventana concreta ni con retardo, ni captura con scroll.
 - Los atajos globales son fijos (no configurables desde la interfaz); se definen en
-  `Snapper/Services/HotKeyManager.swift`.
+  `Tempo/Services/HotKeyManager.swift`.
 - La app no está notarizada: es para uso personal en este Mac.

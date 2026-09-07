@@ -20,3 +20,6 @@ xcuserdata/
 
 # Artefactos locales
 *.log
+
+# Identidad de firma local (cada Mac pone la suya)
+Config/Local.xcconfig

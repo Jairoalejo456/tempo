@@ -10,7 +10,7 @@ if CommandLine.arguments.contains("--self-check") {
 if let index = CommandLine.arguments.firstIndex(of: "--render-sample") {
     let path = CommandLine.arguments.count > index + 1
         ? CommandLine.arguments[index + 1]
-        : "snapper-sample.png"
+        : "tempo-sample.png"
     SampleRenderer.run(outputPath: path)
 }
 

@@ -1,5 +1,5 @@
 import XCTest
-@testable import Snapper
+@testable import Tempo
 
 /// Estado del editor: historial, numeración de contadores y descarte de gestos vacíos.
 final class EditorDocumentTests: XCTestCase {

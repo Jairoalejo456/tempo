@@ -7,13 +7,14 @@
 	objects = {
 
 /* Begin PBXFileReference section */
-		1A0000000000000000000005 /* Snapper.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Snapper.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		1A000000000000000000000B /* SnapperTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SnapperTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		1A0000000000000000000020 /* Signing.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = Signing.xcconfig; path = Config/Signing.xcconfig; sourceTree = "<group>"; };
+		1A0000000000000000000005 /* Tempo.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Tempo.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		1A000000000000000000000B /* TempoTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TempoTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		1A0000000000000000000009 /* Snapper */ = {isa = PBXFileSystemSynchronizedRootGroup; path = Snapper; sourceTree = "<group>"; };
-		1A000000000000000000000F /* SnapperTests */ = {isa = PBXFileSystemSynchronizedRootGroup; path = SnapperTests; sourceTree = "<group>"; };
+		1A0000000000000000000009 /* Tempo */ = {isa = PBXFileSystemSynchronizedRootGroup; path = Tempo; sourceTree = "<group>"; };
+		1A000000000000000000000F /* TempoTests */ = {isa = PBXFileSystemSynchronizedRootGroup; path = TempoTests; sourceTree = "<group>"; };
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -25,8 +26,9 @@
 		1A0000000000000000000002 = {
 			isa = PBXGroup;
 			children = (
-				1A0000000000000000000009 /* Snapper */,
-				1A000000000000000000000F /* SnapperTests */,
+				1A0000000000000000000009 /* Tempo */,
+				1A000000000000000000000F /* TempoTests */,
+				1A0000000000000000000020 /* Signing.xcconfig */,
 				1A0000000000000000000003 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -34,8 +36,8 @@
 		1A0000000000000000000003 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				1A0000000000000000000005 /* Snapper.app */,
-				1A000000000000000000000B /* SnapperTests.xctest */,
+				1A0000000000000000000005 /* Tempo.app */,
+				1A000000000000000000000B /* TempoTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -43,9 +45,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		1A0000000000000000000004 /* Snapper */ = {
+		1A0000000000000000000004 /* Tempo */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 1A0000000000000000000013 /* Build configuration list for PBXNativeTarget "Snapper" */;
+			buildConfigurationList = 1A0000000000000000000013 /* Build configuration list for PBXNativeTarget "Tempo" */;
 			buildPhases = (
 				1A0000000000000000000006 /* Sources */,
 				1A0000000000000000000007 /* Frameworks */,
@@ -54,16 +56,16 @@
 			buildRules = ();
 			dependencies = ();
 			fileSystemSynchronizedGroups = (
-				1A0000000000000000000009 /* Snapper */,
+				1A0000000000000000000009 /* Tempo */,
 			);
-			name = Snapper;
-			productName = Snapper;
-			productReference = 1A0000000000000000000005 /* Snapper.app */;
+			name = Tempo;
+			productName = Tempo;
+			productReference = 1A0000000000000000000005 /* Tempo.app */;
 			productType = "com.apple.product-type.application";
 		};
-		1A000000000000000000000A /* SnapperTests */ = {
+		1A000000000000000000000A /* TempoTests */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 1A0000000000000000000016 /* Build configuration list for PBXNativeTarget "SnapperTests" */;
+			buildConfigurationList = 1A0000000000000000000016 /* Build configuration list for PBXNativeTarget "TempoTests" */;
 			buildPhases = (
 				1A000000000000000000000C /* Sources */,
 				1A000000000000000000000D /* Frameworks */,
@@ -74,11 +76,11 @@
 				1A0000000000000000000019 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
-				1A000000000000000000000F /* SnapperTests */,
+				1A000000000000000000000F /* TempoTests */,
 			);
-			name = SnapperTests;
-			productName = SnapperTests;
-			productReference = 1A000000000000000000000B /* SnapperTests.xctest */;
+			name = TempoTests;
+			productName = TempoTests;
+			productReference = 1A000000000000000000000B /* TempoTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
 /* End PBXNativeTarget section */
@@ -100,7 +102,7 @@
 					};
 				};
 			};
-			buildConfigurationList = 1A0000000000000000000010 /* Build configuration list for PBXProject "Snapper" */;
+			buildConfigurationList = 1A0000000000000000000010 /* Build configuration list for PBXProject "Tempo" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -114,8 +116,8 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				1A0000000000000000000004 /* Snapper */,
-				1A000000000000000000000A /* SnapperTests */,
+				1A0000000000000000000004 /* Tempo */,
+				1A000000000000000000000A /* TempoTests */,
 			);
 		};
 /* End PBXProject section */
@@ -133,7 +135,7 @@
 /* Begin PBXTargetDependency section */
 		1A0000000000000000000019 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = 1A0000000000000000000004 /* Snapper */;
+			target = 1A0000000000000000000004 /* Tempo */;
 			targetProxy = 1A000000000000000000001A /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
@@ -144,13 +146,14 @@
 			containerPortal = 1A0000000000000000000001 /* Project object */;
 			proxyType = 1;
 			remoteGlobalIDString = 1A0000000000000000000004;
-			remoteInfo = Snapper;
+			remoteInfo = Tempo;
 		};
 /* End PBXContainerItemProxy section */
 
 /* Begin XCBuildConfiguration section */
 		1A0000000000000000000011 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 1A0000000000000000000020 /* Signing.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
@@ -177,6 +180,7 @@
 		};
 		1A0000000000000000000012 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 1A0000000000000000000020 /* Signing.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
@@ -198,12 +202,8 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CODE_SIGN_IDENTITY = "Apple Development";
-				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
-				PROVISIONING_PROFILE_SPECIFIER = "";
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = TU_TEAM_ID;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_LSUIElement = YES;
@@ -213,7 +213,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 0.1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.jairo.snapper;
+				PRODUCT_BUNDLE_IDENTIFIER = com.jairo.tempo;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
@@ -224,12 +224,8 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CODE_SIGN_IDENTITY = "Apple Development";
-				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
-				PROVISIONING_PROFILE_SPECIFIER = "";
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = TU_TEAM_ID;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_LSUIElement = YES;
@@ -239,7 +235,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 0.1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.jairo.snapper;
+				PRODUCT_BUNDLE_IDENTIFIER = com.jairo.tempo;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
@@ -250,16 +246,12 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
-				CODE_SIGN_IDENTITY = "Apple Development";
-				CODE_SIGN_STYLE = Manual;
-				PROVISIONING_PROFILE_SPECIFIER = "";
-				DEVELOPMENT_TEAM = TU_TEAM_ID;
 				GENERATE_INFOPLIST_FILE = YES;
-				PRODUCT_BUNDLE_IDENTIFIER = com.jairo.snapper.tests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.jairo.tempo.tests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Snapper.app/Contents/MacOS/Snapper";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Tempo.app/Contents/MacOS/Tempo";
 			};
 			name = Debug;
 		};
@@ -267,23 +259,19 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
-				CODE_SIGN_IDENTITY = "Apple Development";
-				CODE_SIGN_STYLE = Manual;
-				PROVISIONING_PROFILE_SPECIFIER = "";
-				DEVELOPMENT_TEAM = TU_TEAM_ID;
 				GENERATE_INFOPLIST_FILE = YES;
-				PRODUCT_BUNDLE_IDENTIFIER = com.jairo.snapper.tests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.jairo.tempo.tests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Snapper.app/Contents/MacOS/Snapper";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Tempo.app/Contents/MacOS/Tempo";
 			};
 			name = Release;
 		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		1A0000000000000000000010 /* Build configuration list for PBXProject "Snapper" */ = {
+		1A0000000000000000000010 /* Build configuration list for PBXProject "Tempo" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				1A0000000000000000000011 /* Debug */,
@@ -292,7 +280,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		1A0000000000000000000013 /* Build configuration list for PBXNativeTarget "Snapper" */ = {
+		1A0000000000000000000013 /* Build configuration list for PBXNativeTarget "Tempo" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				1A0000000000000000000014 /* Debug */,
@@ -301,7 +289,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		1A0000000000000000000016 /* Build configuration list for PBXNativeTarget "SnapperTests" */ = {
+		1A0000000000000000000016 /* Build configuration list for PBXNativeTarget "TempoTests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				1A0000000000000000000017 /* Debug */,

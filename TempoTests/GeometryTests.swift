@@ -1,6 +1,6 @@
 import AppKit
 import XCTest
-@testable import Snapper
+@testable import Tempo
 
 /// Conversión de coordenadas entre AppKit (origen abajo‑izquierda) y ScreenCaptureKit
 /// (origen arriba‑izquierda), y colocación de la miniatura.

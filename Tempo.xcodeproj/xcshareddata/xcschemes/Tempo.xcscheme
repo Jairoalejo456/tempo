@@ -6,9 +6,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "1A0000000000000000000004"
-               BuildableName = "Snapper.app"
-               BlueprintName = "Snapper"
-               ReferencedContainer = "container:Snapper.xcodeproj">
+               BuildableName = "Tempo.app"
+               BlueprintName = "Tempo"
+               ReferencedContainer = "container:Tempo.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -23,9 +23,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "1A000000000000000000000A"
-               BuildableName = "SnapperTests.xctest"
-               BlueprintName = "SnapperTests"
-               ReferencedContainer = "container:Snapper.xcodeproj">
+               BuildableName = "TempoTests.xctest"
+               BlueprintName = "TempoTests"
+               ReferencedContainer = "container:Tempo.xcodeproj">
             </BuildableReference>
          </TestableReference>
       </Testables>
@@ -44,9 +44,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "1A0000000000000000000004"
-            BuildableName = "Snapper.app"
-            BlueprintName = "Snapper"
-            ReferencedContainer = "container:Snapper.xcodeproj">
+            BuildableName = "Tempo.app"
+            BlueprintName = "Tempo"
+            ReferencedContainer = "container:Tempo.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </LaunchAction>
@@ -60,9 +60,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "1A0000000000000000000004"
-            BuildableName = "Snapper.app"
-            BlueprintName = "Snapper"
-            ReferencedContainer = "container:Snapper.xcodeproj">
+            BuildableName = "Tempo.app"
+            BlueprintName = "Tempo"
+            ReferencedContainer = "container:Tempo.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </ProfileAction>

@@ -4,7 +4,7 @@ import Foundation
 
 /// Genera una imagen de muestra con todas las herramientas aplicadas sobre un lienzo sintético.
 ///
-/// Se ejecuta con `Snapper.app --render-sample <ruta.png>`. Sirve para revisar de un vistazo
+/// Se ejecuta con `Tempo.app --render-sample <ruta.png>`. Sirve para revisar de un vistazo
 /// cómo se dibuja cada herramienta sin necesidad de hacer una captura real, y usa exactamente
 /// el mismo renderizador que el editor.
 enum SampleRenderer {

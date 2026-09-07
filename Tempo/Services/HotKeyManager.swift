@@ -63,7 +63,7 @@ final class HotKeyManager {
         )
 
         guard status == noErr, let reference else {
-            NSLog("[Snapper] No se pudo registrar el atajo \(shortcut.display) (OSStatus \(status)); probablemente ya está en uso por otra aplicación.")
+            NSLog("[Tempo] No se pudo registrar el atajo \(shortcut.display) (OSStatus \(status)); probablemente ya está en uso por otra aplicación.")
             return false
         }
 
@@ -81,8 +81,8 @@ final class HotKeyManager {
     // MARK: - Interno
 
     private static let signature: OSType = {
-        // 'SNPR'
-        let chars: [UInt8] = Array("SNPR".utf8)
+        // 'TMPO'
+        let chars: [UInt8] = Array("TMPO".utf8)
         return chars.reduce(OSType(0)) { ($0 << 8) | OSType($1) }
     }()
 
