@@ -1,5 +1,16 @@
 import SwiftUI
 
+/// Medidas compartidas entre la barra de herramientas (SwiftUI) y la ventana (AppKit), para que
+/// no puedan desincronizarse: si la altura declarada aquí fuese menor que la que el contenido
+/// necesita, los controles se recortarían.
+enum EditorMetrics {
+    /// Alto de la barra de herramientas.
+    static let toolbarHeight: CGFloat = 54
+    /// Alto de un botón de herramienta, incluida la letra de su atajo.
+    static let toolButtonHeight: CGFloat = 38
+    static let toolButtonWidth: CGFloat = 34
+}
+
 /// Barra de herramientas del editor: compacta, discreta y con los atajos siempre a la vista.
 struct EditorToolbarView: View {
 
@@ -33,8 +44,10 @@ struct EditorToolbarView: View {
             helpButton
         }
         .padding(.horizontal, 12)
-        .frame(height: 46)
-        .background(.bar)
+        .frame(height: EditorMetrics.toolbarHeight)
+        // Fondo sólido en lugar de un material translúcido: la vibrancia desaturaba los
+        // círculos de color y hacía difícil distinguir cuál estaba elegido.
+        .background(Color(nsColor: .windowBackgroundColor))
         .overlay(alignment: .bottom) {
             Rectangle()
                 .fill(Color.primary.opacity(0.08))
@@ -83,7 +96,7 @@ struct EditorToolbarView: View {
                 Text(zoomLabel)
                     .font(.system(size: 10, weight: .medium, design: .rounded))
                     .monospacedDigit()
-                    .frame(width: 42, height: 30)
+                    .frame(width: 46, height: EditorMetrics.toolButtonHeight)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -100,16 +113,16 @@ struct EditorToolbarView: View {
     }
 
     private var colorGroup: some View {
-        HStack(spacing: 5) {
+        HStack(spacing: 1) {
             ForEach(Array(AnnotationColor.palette.enumerated()), id: \.offset) { index, color in
                 Button {
                     document.color = color
                 } label: {
                     Circle()
                         .fill(Color(color))
-                        .frame(width: 15, height: 15)
+                        .frame(width: 16, height: 16)
                         .overlay(
-                            Circle().strokeBorder(Color.primary.opacity(0.22), lineWidth: 0.5)
+                            Circle().strokeBorder(Color.primary.opacity(0.25), lineWidth: 0.5)
                         )
                         .overlay(
                             Circle()
@@ -117,9 +130,14 @@ struct EditorToolbarView: View {
                                 .padding(-3)
                                 .opacity(document.color == color ? 1 : 0)
                         )
+                        // Aísla los círculos de cualquier efecto de vibrancia del fondo, para
+                        // que el color que se ve sea exactamente el que se va a dibujar.
+                        .compositingGroup()
+                        .frame(width: 22, height: EditorMetrics.toolButtonHeight)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .help("Color \(index + 1)")
+                .help("Color \(index + 1) · tecla \(index + 1)")
             }
         }
         .opacity(document.tool.usesColor ? 1 : 0.35)
@@ -136,7 +154,7 @@ struct EditorToolbarView: View {
                     Circle()
                         .fill(Color.primary.opacity(0.75))
                         .frame(width: weight.dotSize, height: weight.dotSize)
-                        .frame(width: 22, height: 22)
+                        .frame(width: 26, height: 26)
                         .background(
                             RoundedRectangle(cornerRadius: 5)
                                 .fill(isSelected(weight) ? Color.primary.opacity(0.12) : .clear)
@@ -185,7 +203,7 @@ struct EditorToolbarView: View {
     private var divider: some View {
         Rectangle()
             .fill(Color.primary.opacity(0.12))
-            .frame(width: 1, height: 22)
+            .frame(width: 1, height: 26)
     }
 
     private func isSelected(_ weight: LineWeight) -> Bool {
@@ -204,25 +222,24 @@ private struct ToolButton: View {
 
     var body: some View {
         Button(action: action) {
-            ZStack(alignment: .bottomTrailing) {
-                RoundedRectangle(cornerRadius: 6)
-                    .fill(isSelected ? Color.accentColor.opacity(0.18) : .clear)
-                    .frame(width: 30, height: 30)
-
+            VStack(spacing: 1) {
                 Image(systemName: symbol)
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(isSelected ? Color.accentColor : Color.primary.opacity(0.8))
-                    .frame(width: 30, height: 30)
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(isSelected ? Color.accentColor : Color.primary.opacity(0.85))
+                    .frame(height: 18)
 
-                // La tecla del atajo se muestra siempre, en pequeño, para poder aprenderla.
-                if let shortcut {
-                    Text(shortcut)
-                        .font(.system(size: 8, weight: .semibold, design: .rounded))
-                        .foregroundStyle(isSelected ? Color.accentColor : Color.secondary.opacity(0.75))
-                        .padding(.trailing, 1)
-                        .padding(.bottom, 0.5)
-                }
+                // La tecla del atajo se muestra siempre, para poder aprenderla. Ocupa su propio
+                // espacio en lugar de superponerse al icono.
+                Text(shortcut ?? " ")
+                    .font(.system(size: 9, weight: .semibold, design: .rounded))
+                    .foregroundStyle(isSelected ? Color.accentColor : Color.secondary.opacity(0.8))
+                    .frame(height: 11)
             }
+            .frame(width: EditorMetrics.toolButtonWidth, height: EditorMetrics.toolButtonHeight)
+            .background(
+                RoundedRectangle(cornerRadius: 7)
+                    .fill(isSelected ? Color.accentColor.opacity(0.16) : .clear)
+            )
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

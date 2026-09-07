@@ -47,8 +47,12 @@ enum EditorTool: Equatable, Hashable, Identifiable {
         }
     }
 
+    /// Si la paleta de colores es relevante con esta herramienta.
+    ///
+    /// Con el puntero lo es: elegir un color mientras se navega deja preparado el que usará la
+    /// siguiente anotación. La única que lo ignora es el blur, que no pinta con color.
     var usesColor: Bool {
-        annotationTool?.usesColor ?? false
+        annotationTool?.usesColor ?? true
     }
 
     /// Orden en que se muestran en la barra de herramientas.

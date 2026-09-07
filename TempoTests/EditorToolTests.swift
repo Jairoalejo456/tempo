@@ -27,10 +27,11 @@ final class EditorToolTests: XCTestCase {
         XCTAssertEqual(EditorTool.allCases.count, AnnotationTool.allCases.count + 1)
     }
 
-    func testPointerDoesNotUseColor() {
-        XCTAssertFalse(EditorTool.navigate.usesColor)
+    func testColorPaletteStaysAvailableWithThePointer() {
+        XCTAssertTrue(EditorTool.navigate.usesColor,
+                      "Con el puntero se puede dejar preparado el color de la siguiente anotación")
         XCTAssertTrue(EditorTool.annotate(.arrow).usesColor)
-        XCTAssertFalse(EditorTool.annotate(.blur).usesColor, "El blur no pinta con color")
+        XCTAssertFalse(EditorTool.annotate(.blur).usesColor, "El blur es la única que no pinta con color")
     }
 
     func testZoomStateStartsFitted() {

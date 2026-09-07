@@ -28,6 +28,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             DispatchQueue.main.async {
                 AppCoordinator.shared.presentDemoCapture(openingEditor: opensEditor)
             }
+
+            // `--shot <ruta>`: se captura a sí misma pasado un momento, con sus ventanas ya en
+            // primer plano. Sirve para revisar la interfaz durante el desarrollo.
+            if let index = CommandLine.arguments.firstIndex(of: "--shot"),
+               CommandLine.arguments.count > index + 1 {
+                let path = CommandLine.arguments[index + 1]
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.8) {
+                    NSApp.activate(ignoringOtherApps: true)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                        SelfCheck.captureScreen(to: path, includingOwnWindows: true)
+                    }
+                }
+            }
             return
         }
 

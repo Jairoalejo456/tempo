@@ -27,7 +27,7 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSMenu
 
         let window = NSWindow(
             contentRect: NSRect(origin: .zero, size: EditorWindowController.preferredContentSize(for: document)),
-            styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
+            styleMask: [.titled, .closable, .miniaturizable, .resizable],
             backing: .buffered,
             defer: false
         )
@@ -80,7 +80,7 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSMenu
             hosting.topAnchor.constraint(equalTo: container.topAnchor),
             hosting.leadingAnchor.constraint(equalTo: container.leadingAnchor),
             hosting.trailingAnchor.constraint(equalTo: container.trailingAnchor),
-            hosting.heightAnchor.constraint(equalToConstant: 46),
+            hosting.heightAnchor.constraint(equalToConstant: EditorMetrics.toolbarHeight),
 
             canvas.topAnchor.constraint(equalTo: hosting.bottomAnchor),
             canvas.leadingAnchor.constraint(equalTo: container.leadingAnchor),
@@ -94,7 +94,7 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSMenu
     /// Tamaño inicial: la captura a tamaño real si cabe, o ajustada a la pantalla.
     private static func preferredContentSize(for document: EditorDocument) -> CGSize {
         let image = document.capture.logicalSize
-        let toolbarHeight: CGFloat = 46
+        let toolbarHeight = EditorMetrics.toolbarHeight
         let chrome: CGFloat = 60
         let visible = (NSScreen.main?.visibleFrame.size) ?? CGSize(width: 1440, height: 900)
         let maxWidth = visible.width * 0.9
