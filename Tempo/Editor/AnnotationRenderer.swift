@@ -28,9 +28,31 @@ enum AnnotationRenderer {
     }
 
     static func draw(_ annotation: Annotation, capture: CaptureImage, in context: CGContext) {
+        guard annotation.rotation != 0 else {
+            drawUnrotated(annotation, capture: capture, in: context)
+            return
+        }
+        context.saveGState()
+        context.concatenate(rotationTransform(for: annotation))
+        drawUnrotated(annotation, capture: capture, in: context)
+        context.restoreGState()
+    }
+
+    /// Giro alrededor del centro de la anotación.
+    static func rotationTransform(for annotation: Annotation) -> CGAffineTransform {
+        let pivot = annotation.center
+        return CGAffineTransform(translationX: pivot.x, y: pivot.y)
+            .rotated(by: annotation.rotation)
+            .translatedBy(x: -pivot.x, y: -pivot.y)
+    }
+
+    private static func drawUnrotated(_ annotation: Annotation, capture: CaptureImage, in context: CGContext) {
         switch annotation.shape {
         case let .blur(rect):
-            drawBlur(rect: rect, capture: capture, in: context)
+            drawBlur(rect: rect,
+                     undoingRotation: annotation.rotation == 0 ? nil : rotationTransform(for: annotation).inverted(),
+                     capture: capture,
+                     in: context)
         case let .rectangle(rect):
             withShadow(in: context) {
                 context.setStrokeColor(annotation.style.color.cgColor)
@@ -78,12 +100,20 @@ enum AnnotationRenderer {
 
     // MARK: - Implementación por herramienta
 
-    private static func drawBlur(rect: CGRect, capture: CaptureImage, in context: CGContext) {
+    private static func drawBlur(rect: CGRect,
+                                 undoingRotation inverse: CGAffineTransform?,
+                                 capture: CaptureImage,
+                                 in context: CGContext) {
         guard let blurred = capture.blurredImage() else { return }
         context.saveGState()
+        // El recorte sí gira con el rectángulo…
         context.clip(to: rect)
-        // Se dibuja la imagen difuminada completa recortada al rectángulo: así no hay
-        // conversiones de píxeles y el difuminado encaja perfectamente con el fondo.
+        // …pero la imagen difuminada debe quedar alineada con la captura: si girase, el
+        // difuminado dejaría de corresponderse con lo que hay debajo. Se deshace aquí el giro
+        // que ya aplicó quien nos llamó.
+        if let inverse {
+            context.concatenate(inverse)
+        }
         context.interpolationQuality = .high
         context.draw(blurred, in: capture.logicalBounds)
         context.restoreGState()

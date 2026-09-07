@@ -25,8 +25,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Modo demo: abre una captura de ejemplo para probar el editor sin permisos.
         if CommandLine.arguments.contains("--demo") {
             let opensEditor = CommandLine.arguments.contains("--editor")
+            let annotated = CommandLine.arguments.contains("--annotated")
             DispatchQueue.main.async {
-                AppCoordinator.shared.presentDemoCapture(openingEditor: opensEditor)
+                AppCoordinator.shared.presentDemoCapture(openingEditor: opensEditor,
+                                                         withSampleAnnotations: annotated)
             }
 
             // `--shot <ruta>`: se captura a sí misma pasado un momento, con sus ventanas ya en

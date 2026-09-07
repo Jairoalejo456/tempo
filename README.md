@@ -138,6 +138,9 @@ Durante la selección de región: arrastra para definir la zona (se muestra el t
 
 | Acción | Atajo |
 |---|---|
+| Mover lo seleccionado | flechas (`⇧` = 10 px) |
+| Eliminar lo seleccionado | `⌫` |
+| Quitar la selección | `Esc` |
 | Acercar / Alejar | `⌘+` / `⌘−` |
 | Ajustar a la ventana | `⌘0` |
 | Tamaño real | `⌘1` |
@@ -185,6 +188,35 @@ Launchpad y en la carpeta Aplicaciones. Al abrirla desde ahí estando ya en marc
 ajustes, para que hacer clic tenga una respuesta visible. Si prefieres que además ocupe sitio
 en el Dock de forma permanente, actívalo en **Ajustes › General › Mostrar el icono en el Dock**.
 
+## Todo lo que dibujas sigue siendo editable
+
+Las anotaciones no quedan estampadas sobre la captura. Con el **puntero** (`V`) puedes volver a
+cualquiera de ellas:
+
+- **Clic** para seleccionarla. Las formas huecas se agarran por su contorno, así que puedes
+  elegir lo que haya dentro de un rectángulo grande; el blur, que está relleno, se agarra por
+  cualquier punto.
+- **Arrastrar** para moverla, o las **flechas del teclado** para ajustarla al píxel (`⇧` da
+  pasos de diez).
+- **Ocho tiradores** para cambiar el tamaño; con `⇧` se mantiene la proporción.
+- **Tirador circular superior** para girarla; con `⇧` salta de 15 en 15 grados.
+- Una **flecha** se reorienta moviendo sus extremos, que es más directo que girarla.
+- **`⌫`** para eliminarla, o el botón de papelera de la barra.
+- Cambiar de **color o grosor** con algo seleccionado lo aplica a esa anotación.
+
+**Doble clic** entra a editar el contenido: el texto de una anotación de texto, o el número de
+un contador.
+
+### Contadores con el número que quieras
+
+Los contadores se numeran solos al ponerlos, pero no estás atado a ese orden. Selecciona uno y
+cámbialo desde el control **N.º** de la barra, o haz doble clic sobre él y escribe el número.
+Si tienes el 1, 2 y 3 y quieres que el siguiente sea el 8, lo pones y ya está; a partir de ahí
+la numeración automática continúa desde el mayor que exista.
+
+Un arrastre completo —mover, redimensionar o girar— cuenta como **una sola** operación de
+deshacer, no una por cada movimiento del ratón.
+
 ## Herramientas del editor
 
 - **Flecha**, **rectángulo**, **elipse** y **lápiz** con color y grosor configurables.
@@ -226,6 +258,9 @@ Tools/            Utilidades de desarrollo
   se guarda a resolución completa sin que el editor tenga que saber nada de ello.
 - **La sesión es la dueña de la captura.** La miniatura y el editor son sólo dos formas de
   mostrar la misma sesión, por eso cerrar el editor nunca destruye el trabajo.
+- **El giro se guarda aparte de la forma.** Cada anotación se define sin girar y el ángulo se
+  aplica al dibujar, al buscar qué se ha pulsado y al colocar los tiradores. Así la geometría
+  de cada herramienta sigue siendo sencilla y el giro funciona igual en todas.
 - **`RegisterEventHotKey` (Carbon)** para los atajos globales, en lugar de monitores de
   eventos: es la vía que no exige permiso de Accesibilidad.
 - **`SCScreenshotManager` (ScreenCaptureKit)** para capturar, excluyendo siempre la propia
@@ -265,8 +300,9 @@ portapapeles y escribe un PNG en disco.
 Para probar el editor completo sin conceder ningún permiso, con una captura de ejemplo:
 
 ```bash
-open -n /Applications/Tempo.app --args --demo          # miniatura flotante
-open -n /Applications/Tempo.app --args --demo --editor # y además el editor
+open -n /Applications/Tempo.app --args --demo                         # miniatura flotante
+open -n /Applications/Tempo.app --args --demo --editor                # y además el editor
+open -n /Applications/Tempo.app --args --demo --editor --annotated    # con anotaciones de ejemplo
 ```
 
 Para capturar la pantalla desde la propia aplicación (útil para revisar su interfaz, ya que
@@ -296,7 +332,8 @@ captura y al arrancar la aplicación.
 
 ## Limitaciones conocidas
 
-- No hay selección ni edición de anotaciones ya creadas: se corrigen con `⌘Z` o `⌫`.
+- No se pueden seleccionar varias anotaciones a la vez ni agruparlas.
+- No hay capas: el orden de dibujo es el orden en que se crearon.
 - No hay captura de ventana concreta ni con retardo, ni captura con scroll.
 - Los atajos del editor son fijos; sólo los dos globales son configurables.
 - La app no está notarizada: es para uso personal en este Mac.

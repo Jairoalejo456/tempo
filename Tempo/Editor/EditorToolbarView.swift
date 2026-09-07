@@ -8,7 +8,7 @@ enum EditorMetrics {
     static let toolbarHeight: CGFloat = 54
     /// Alto de un botón de herramienta, incluida la letra de su atajo.
     static let toolButtonHeight: CGFloat = 38
-    static let toolButtonWidth: CGFloat = 34
+    static let toolButtonWidth: CGFloat = 32
 }
 
 /// Barra de herramientas del editor: compacta, discreta y con los atajos siempre a la vista.
@@ -26,24 +26,24 @@ struct EditorToolbarView: View {
 
     @State private var showsShortcuts = false
 
+    /// Cuánto espacio se permite ocupar a la barra. Cuando la ventana es estrecha —o cuando
+    /// aparecen los controles de la selección— se va recortando lo accesorio antes que
+    /// esconder ningún control.
+    private enum Density {
+        /// Todo con su etiqueta y los botones de zoom.
+        case comfortable
+        /// Sin los botones de zoom: quedan sus atajos y el porcentaje, que también ajusta.
+        case compact
+        /// Copiar y Guardar sólo con su icono.
+        case minimal
+    }
+
     var body: some View {
-        HStack(spacing: 10) {
-            toolGroup
-            divider
-            colorGroup
-            divider
-            widthGroup
-            divider
-            historyGroup
-            divider
-            zoomGroup
-
-            Spacer(minLength: 12)
-
-            actionGroup
-            helpButton
+        ViewThatFits(in: .horizontal) {
+            content(density: .comfortable)
+            content(density: .compact)
+            content(density: .minimal)
         }
-        .padding(.horizontal, 12)
         .frame(height: EditorMetrics.toolbarHeight)
         // Fondo sólido en lugar de un material translúcido: la vibrancia desaturaba los
         // círculos de color y hacía difícil distinguir cuál estaba elegido.
@@ -53,6 +53,33 @@ struct EditorToolbarView: View {
                 .fill(Color.primary.opacity(0.08))
                 .frame(height: 1)
         }
+    }
+
+    private func content(density: Density) -> some View {
+        HStack(spacing: density == .comfortable ? 9 : 6) {
+            toolGroup
+            divider
+            colorGroup
+            divider
+            widthGroup
+            divider
+            historyGroup
+
+            if document.selectedAnnotation != nil {
+                divider
+                selectionGroup
+            }
+
+            divider
+            zoomGroup(showsButtons: density == .comfortable)
+
+            Spacer(minLength: 10)
+
+            actionGroup(showsLabels: density != .minimal)
+            helpButton
+        }
+        .padding(.horizontal, 12)
+        .frame(height: EditorMetrics.toolbarHeight)
     }
 
     // MARK: - Grupos
@@ -86,11 +113,13 @@ struct EditorToolbarView: View {
         }
     }
 
-    /// Control de zoom: porcentaje actual y botones para acercar, alejar y ajustar.
-    private var zoomGroup: some View {
+    /// Control de zoom: porcentaje actual y, si hay sitio, botones para acercar y alejar.
+    private func zoomGroup(showsButtons: Bool) -> some View {
         HStack(spacing: 2) {
-            ToolButton(symbol: "minus.magnifyingglass", shortcut: nil, isSelected: false,
-                       help: "Alejar · ⌘−", action: onZoomOut)
+            if showsButtons {
+                ToolButton(symbol: "minus.magnifyingglass", shortcut: nil, isSelected: false,
+                           help: "Alejar · ⌘−", action: onZoomOut)
+            }
 
             Button(action: onZoomToFit) {
                 Text(zoomLabel)
@@ -100,10 +129,12 @@ struct EditorToolbarView: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .help("Ajustar a la ventana · ⌘0")
+            .help("Ajustar a la ventana · ⌘0. Acercar y alejar: ⌘+ / ⌘− o la rueda del ratón.")
 
-            ToolButton(symbol: "plus.magnifyingglass", shortcut: nil, isSelected: false,
-                       help: "Acercar · ⌘+", action: onZoomIn)
+            if showsButtons {
+                ToolButton(symbol: "plus.magnifyingglass", shortcut: nil, isSelected: false,
+                           help: "Acercar · ⌘+", action: onZoomIn)
+            }
         }
     }
 
@@ -117,6 +148,8 @@ struct EditorToolbarView: View {
             ForEach(Array(AnnotationColor.palette.enumerated()), id: \.offset) { index, color in
                 Button {
                     document.color = color
+                    // Si hay algo seleccionado, el color se aplica también a ello.
+                    document.applyColorToSelection()
                 } label: {
                     Circle()
                         .fill(Color(color))
@@ -133,7 +166,7 @@ struct EditorToolbarView: View {
                         // Aísla los círculos de cualquier efecto de vibrancia del fondo, para
                         // que el color que se ve sea exactamente el que se va a dibujar.
                         .compositingGroup()
-                        .frame(width: 22, height: EditorMetrics.toolButtonHeight)
+                        .frame(width: 20, height: EditorMetrics.toolButtonHeight)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
@@ -150,11 +183,12 @@ struct EditorToolbarView: View {
                 Button {
                     document.lineWidth = weight.lineWidth
                     document.fontSize = weight.fontSize
+                    document.applyWeightToSelection()
                 } label: {
                     Circle()
                         .fill(Color.primary.opacity(0.75))
                         .frame(width: weight.dotSize, height: weight.dotSize)
-                        .frame(width: 26, height: 26)
+                        .frame(width: 24, height: 24)
                         .background(
                             RoundedRectangle(cornerRadius: 5)
                                 .fill(isSelected(weight) ? Color.primary.opacity(0.12) : .clear)
@@ -164,6 +198,41 @@ struct EditorToolbarView: View {
                 .help("Grosor \(weight.title)")
             }
         }
+    }
+
+    /// Controles que sólo tienen sentido con una anotación seleccionada.
+    @ViewBuilder
+    private var selectionGroup: some View {
+        HStack(spacing: 6) {
+            if let selected = document.selectedAnnotation, let number = selected.counterNumber {
+                // Un contador se puede renumerar a mano: no está atado al orden en que se puso.
+                HStack(spacing: 3) {
+                    Text("N.º")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                    Stepper(
+                        value: Binding(
+                            get: { number },
+                            set: { document.setCounterNumber($0, for: selected.id) }
+                        ),
+                        in: 0...9999
+                    ) {
+                        Text("\(number)")
+                            .font(.system(size: 12, weight: .semibold, design: .rounded))
+                            .monospacedDigit()
+                            .frame(minWidth: 22)
+                    }
+                    .controlSize(.small)
+                }
+                .help("Número del contador. También puedes hacer doble clic sobre él.")
+            }
+
+            ToolButton(symbol: "trash", shortcut: nil, isSelected: false,
+                       help: "Eliminar lo seleccionado · ⌫") {
+                document.deleteSelected()
+            }
+        }
+        .fixedSize()
     }
 
     private var historyGroup: some View {
@@ -177,11 +246,13 @@ struct EditorToolbarView: View {
         }
     }
 
-    private var actionGroup: some View {
-        HStack(spacing: 8) {
+    private func actionGroup(showsLabels: Bool) -> some View {
+        HStack(spacing: 6) {
             ActionButton(symbol: "doc.on.doc", title: "Copiar", shortcut: "⌘C",
+                         showsLabel: showsLabels,
                          help: "Copiar la imagen con anotaciones · ⌘C", action: onCopy)
             ActionButton(symbol: "square.and.arrow.down", title: "Guardar", shortcut: "⌘S",
+                         showsLabel: showsLabels,
                          help: "Guardar como PNG · ⌘S", action: onSave)
         }
     }
@@ -252,6 +323,7 @@ private struct ActionButton: View {
     let symbol: String
     let title: String
     let shortcut: String
+    var showsLabel: Bool = true
     let help: String
     let action: () -> Void
 
@@ -260,13 +332,15 @@ private struct ActionButton: View {
             HStack(spacing: 5) {
                 Image(systemName: symbol)
                     .font(.system(size: 12, weight: .medium))
-                Text(title)
-                    .font(.system(size: 12))
-                Text(shortcut)
-                    .font(.system(size: 10, weight: .medium, design: .rounded))
-                    .foregroundStyle(.secondary)
+                if showsLabel {
+                    Text(title)
+                        .font(.system(size: 12))
+                    Text(shortcut)
+                        .font(.system(size: 10, weight: .medium, design: .rounded))
+                        .foregroundStyle(.secondary)
+                }
             }
-            .padding(.horizontal, 9)
+            .padding(.horizontal, showsLabel ? 9 : 7)
             .padding(.vertical, 5)
             .background(
                 RoundedRectangle(cornerRadius: 6)

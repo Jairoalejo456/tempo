@@ -93,11 +93,16 @@ struct Annotation: Identifiable, Equatable {
     let id: UUID
     var shape: AnnotationShape
     var style: AnnotationStyle
+    /// Giro en radianes alrededor del centro de la anotación. Se guarda aparte de la forma
+    /// para que la geometría siga siendo sencilla: la forma vive sin rotar y el giro se aplica
+    /// al dibujar, al buscar el punto pulsado y al colocar los tiradores.
+    var rotation: CGFloat
 
-    init(id: UUID = UUID(), shape: AnnotationShape, style: AnnotationStyle) {
+    init(id: UUID = UUID(), shape: AnnotationShape, style: AnnotationStyle, rotation: CGFloat = 0) {
         self.id = id
         self.shape = shape
         self.style = style
+        self.rotation = rotation
     }
 
     var tool: AnnotationTool { shape.tool }

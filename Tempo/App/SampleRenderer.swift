@@ -76,7 +76,7 @@ enum SampleRenderer {
         return CaptureImage(cgImage: context.makeImage()!, scale: scale)
     }
 
-    private static func addSampleAnnotations(to document: EditorDocument) {
+    static func addSampleAnnotations(to document: EditorDocument) {
         document.color = .red
         document.add(Annotation(shape: .rectangle(CGRect(x: 200, y: 300, width: 300, height: 60)),
                                 style: document.currentStyle))

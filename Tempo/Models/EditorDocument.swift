@@ -20,6 +20,10 @@ final class EditorDocument: ObservableObject {
     /// Anotación que se está creando con el ratón; se dibuja pero aún no forma parte del historial.
     @Published var draft: Annotation?
 
+    /// Anotación seleccionada, si hay alguna. Las anotaciones no quedan "estampadas": se pueden
+    /// volver a elegir para moverlas, redimensionarlas, girarlas o cambiarles el estilo.
+    @Published var selectedID: UUID?
+
     // MARK: - Presentación
 
     /// Zoom aplicado por el usuario, relativo al ajuste a la ventana (1 = ajustada).
@@ -75,6 +79,88 @@ final class EditorDocument: ObservableObject {
     func add(_ annotation: Annotation) {
         guard annotation.isMeaningful else { return }
         perform { $0.append(annotation) }
+        selectedID = annotation.id
+    }
+
+    // MARK: - Selección
+
+    var selectedAnnotation: Annotation? {
+        guard let selectedID else { return nil }
+        return annotations.first { $0.id == selectedID }
+    }
+
+    func select(_ id: UUID?) {
+        guard selectedID != id else { return }
+        selectedID = id
+    }
+
+    /// Anotación bajo un punto, empezando por la de encima.
+    func annotation(at point: CGPoint, tolerance: CGFloat) -> Annotation? {
+        annotations.reversed().first { $0.hitTest(point, tolerance: tolerance) }
+    }
+
+    func deleteSelected() {
+        guard let selectedID else { return }
+        perform { $0.removeAll { $0.id == selectedID } }
+        self.selectedID = nil
+    }
+
+    // MARK: - Cambios sobre una anotación existente
+
+    /// Sustituye una anotación registrando el cambio en el historial.
+    func replace(_ annotation: Annotation) {
+        perform { list in
+            guard let index = list.firstIndex(where: { $0.id == annotation.id }) else { return }
+            list[index] = annotation
+        }
+    }
+
+    /// Snapshot tomado al empezar un arrastre, para que toda la interacción cuente como una
+    /// sola operación de deshacer en lugar de una por cada movimiento del ratón.
+    private var interactionSnapshot: [Annotation]?
+
+    func beginInteractiveChange() {
+        guard interactionSnapshot == nil else { return }
+        interactionSnapshot = annotations
+    }
+
+    /// Actualiza la anotación sin tocar el historial. Se usa durante el arrastre.
+    func updateLive(_ annotation: Annotation) {
+        guard let index = annotations.firstIndex(where: { $0.id == annotation.id }) else { return }
+        annotations[index] = annotation
+    }
+
+    func endInteractiveChange() {
+        guard let snapshot = interactionSnapshot else { return }
+        interactionSnapshot = nil
+        guard snapshot != annotations else { return }
+        undoStack.append(snapshot)
+        redoStack.removeAll()
+    }
+
+    // MARK: - Estilo de lo seleccionado
+
+    /// Aplica el color activo a la anotación seleccionada, si la hay.
+    func applyColorToSelection() {
+        guard var annotation = selectedAnnotation, annotation.tool.usesColor else { return }
+        annotation.style.color = color
+        replace(annotation)
+    }
+
+    func applyWeightToSelection() {
+        guard var annotation = selectedAnnotation else { return }
+        annotation.style.lineWidth = lineWidth
+        if annotation.tool == .text || annotation.tool == .counter {
+            annotation.style.fontSize = fontSize
+        }
+        replace(annotation)
+    }
+
+    /// Cambia el número de un contador ya colocado.
+    func setCounterNumber(_ number: Int, for id: UUID) {
+        guard let annotation = annotations.first(where: { $0.id == id }),
+              annotation.counterNumber != nil else { return }
+        replace(annotation.withCounterNumber(number))
     }
 
     func removeLast() {
@@ -96,12 +182,22 @@ final class EditorDocument: ObservableObject {
         guard let previous = undoStack.popLast() else { return }
         redoStack.append(annotations)
         annotations = previous
+        pruneSelection()
     }
 
     func redo() {
         guard let next = redoStack.popLast() else { return }
         undoStack.append(annotations)
         annotations = next
+        pruneSelection()
+    }
+
+    /// Tras deshacer o rehacer, la anotación seleccionada puede haber dejado de existir.
+    private func pruneSelection() {
+        guard let selectedID else { return }
+        if !annotations.contains(where: { $0.id == selectedID }) {
+            self.selectedID = nil
+        }
     }
 
     /// `true` cuando el documento tiene cambios sin exportar (se usa al cerrar el editor).

@@ -34,7 +34,7 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSMenu
         window.title = "Captura"
         window.titlebarAppearsTransparent = false
         window.isReleasedWhenClosed = false
-        window.minSize = NSSize(width: 720, height: 300)
+        window.minSize = NSSize(width: 880, height: 320)
         window.tabbingMode = .disallowed
 
         super.init(window: window)
@@ -101,7 +101,7 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSMenu
         let maxHeight = visible.height * 0.9 - chrome
 
         let scale = min(maxWidth / image.width, (maxHeight - toolbarHeight) / image.height, 1)
-        return CGSize(width: max(760, (image.width * scale).rounded() + 32),
+        return CGSize(width: max(940, (image.width * scale).rounded() + 32),
                       height: max(320, (image.height * scale).rounded() + toolbarHeight + 32))
     }
 
@@ -116,13 +116,16 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSMenu
     }
 
     func hideWindow() {
-        canvas.commitTextEditor()
+        flushPendingEdits()
         window?.orderOut(nil)
     }
 
-    /// Confirma cualquier texto pendiente antes de exportar.
+    /// Confirma cualquier texto o número a medio escribir antes de exportar.
     func flushPendingEdits() {
         canvas.commitTextEditor()
+        canvas.commitCounterEditor()
+        // La selección no debe salir dibujada en la imagen final.
+        editorDocument.select(nil)
     }
 
     // MARK: - Acciones (también accesibles desde el menú principal)
@@ -137,6 +140,7 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSMenu
 
     @IBAction func undoEdit(_ sender: Any?) {
         canvas.commitTextEditor()
+        canvas.commitCounterEditor()
         editorDocument.undo()
     }
 
@@ -168,15 +172,15 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSMenu
         editorDelegate?.editorRequestedDiscard(self)
     }
 
-    /// `true` mientras el usuario escribe una anotación de texto.
-    var isEditingText: Bool { canvas.isEditingText }
+    /// `true` mientras el usuario escribe una anotación de texto o el número de un contador.
+    var isEditingText: Bool { canvas.isEditingText || canvas.isEditingCounter }
 
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
         switch menuItem.action {
         case #selector(undoEdit(_:)): return editorDocument.canUndo
         case #selector(redoEdit(_:)): return editorDocument.canRedo
         // Mientras se escribe un texto, ⌘C debe copiar texto: lo atiende el campo de edición.
-        case #selector(copyImage(_:)): return !canvas.isEditingText
+        case #selector(copyImage(_:)): return !isEditingText
         default: return true
         }
     }
@@ -197,18 +201,22 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSMenu
     private func handle(_ event: NSEvent) -> Bool {
         let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
 
-        // Esc: cancela el texto en edición o vuelve a la miniatura.
+        // Esc va deshaciendo estados, del más concreto al más general.
         if event.keyCode == 53 {
-            if canvas.isEditingText {
+            if canvas.isEditingCounter {
+                canvas.cancelCounterEditor()
+            } else if canvas.isEditingText {
                 canvas.cancelTextEditor()
+            } else if editorDocument.selectedAnnotation != nil {
+                editorDocument.select(nil)
             } else {
                 editorDelegate?.editorRequestedReturnToThumbnail(self)
             }
             return true
         }
 
-        // Mientras se escribe un texto, las teclas pertenecen al texto.
-        guard !canvas.isEditingText else { return false }
+        // Mientras se escribe un texto o un número, las teclas pertenecen a ese campo.
+        guard !canvas.isEditingText, !canvas.isEditingCounter else { return false }
         guard modifiers.isEmpty || modifiers == .shift else { return false }
         guard let characters = event.charactersIgnoringModifiers?.lowercased(), !characters.isEmpty else { return false }
 
@@ -219,6 +227,7 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSMenu
 
         if let index = Int(characters), (1...AnnotationColor.palette.count).contains(index) {
             editorDocument.color = AnnotationColor.palette[index - 1]
+            editorDocument.applyColorToSelection()
             return true
         }
 
@@ -240,6 +249,7 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSMenu
         let next = min(max(current + delta, 0), weights.count - 1)
         editorDocument.lineWidth = weights[next].lineWidth
         editorDocument.fontSize = weights[next].fontSize
+        editorDocument.applyWeightToSelection()
     }
 
     // MARK: - NSWindowDelegate

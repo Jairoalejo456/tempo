@@ -61,9 +61,17 @@ final class AppCoordinator: NSObject {
     /// Abre una captura de ejemplo para poder probar el editor sin necesidad del permiso de
     /// grabación de pantalla. Se activa con `--demo`.
     @MainActor
-    func presentDemoCapture(openingEditor: Bool = false) {
+    func presentDemoCapture(openingEditor: Bool = false, withSampleAnnotations: Bool = false) {
         present(capture: SampleRenderer.makeSyntheticCapture(), on: NSScreen.main)
-        guard openingEditor, let session = sessions.last else { return }
+        guard let session = sessions.last else { return }
+        if withSampleAnnotations {
+            SampleRenderer.addSampleAnnotations(to: session.document)
+            // Se deja elegido un rectángulo, que es la forma con todos los tiradores.
+            if let rectangle = session.document.annotations.first(where: { $0.tool == .rectangle }) {
+                session.document.select(rectangle.id)
+            }
+        }
+        guard openingEditor else { return }
         openEditor(for: session)
     }
 

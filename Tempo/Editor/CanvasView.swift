@@ -20,9 +20,26 @@ final class CanvasView: NSView {
     private var panAnchor: CGPoint?
     private var panOffsetAtDragStart: CGPoint = .zero
 
+    /// Manipulación en curso de una anotación ya existente.
+    private enum Manipulation {
+        case moving(id: UUID, grabPoint: CGPoint, original: Annotation)
+        case resizing(id: UUID, handle: AnnotationHandle)
+        case rotating(id: UUID)
+    }
+    private var manipulation: Manipulation?
+
+    /// Radio, en puntos de pantalla, de los tiradores de la selección.
+    private let handleRadius: CGFloat = 4.5
+
     /// Editor de texto en línea, cuando la herramienta de texto está activa.
     private var textEditor: InlineTextEditor?
     private var textEditorOrigin: CGPoint?
+    /// Si se está reeditando un texto ya existente en lugar de crear uno nuevo.
+    private var textEditorAnnotationID: UUID?
+
+    /// Editor del número de un contador ya colocado.
+    private var counterEditor: NSTextField?
+    private var counterEditorAnnotationID: UUID?
 
     init(document: EditorDocument) {
         self.document = document
@@ -187,15 +204,77 @@ final class CanvasView: NSView {
         AnnotationRenderer.drawBase(document.capture, in: context)
         AnnotationRenderer.draw(document.renderableAnnotations, capture: document.capture, in: context)
         context.restoreGState()
+
+        // La selección se dibuja fuera de la escala de la imagen para que su grosor y sus
+        // tiradores midan siempre lo mismo en pantalla, sea cual sea el zoom.
+        if let selected = document.selectedAnnotation, document.draft == nil {
+            drawSelection(for: selected, in: context)
+        }
+    }
+
+    /// Contorno y tiradores de la anotación seleccionada.
+    private func drawSelection(for annotation: Annotation, in context: CGContext) {
+        let bounds = annotation.localBounds
+        let corners = [
+            CGPoint(x: bounds.minX, y: bounds.minY),
+            CGPoint(x: bounds.maxX, y: bounds.minY),
+            CGPoint(x: bounds.maxX, y: bounds.maxY),
+            CGPoint(x: bounds.minX, y: bounds.maxY)
+        ].map { viewPoint(from: annotation.toImage($0)) }
+
+        context.saveGState()
+        context.setStrokeColor(NSColor.controlAccentColor.cgColor)
+        context.setLineWidth(1)
+        context.setLineDash(phase: 0, lengths: [4, 3])
+        context.beginPath()
+        context.move(to: corners[0])
+        for corner in corners.dropFirst() { context.addLine(to: corner) }
+        context.closePath()
+        context.strokePath()
+        context.setLineDash(phase: 0, lengths: [])
+
+        let handles = annotation.handlePositions()
+
+        // Línea que une el tirador de giro con el borde superior.
+        if let rotateHandle = handles[.rotate] {
+            let top = viewPoint(from: annotation.toImage(CGPoint(x: bounds.midX, y: bounds.maxY)))
+            context.beginPath()
+            context.move(to: top)
+            context.addLine(to: viewPoint(from: rotateHandle))
+            context.strokePath()
+        }
+
+        for (handle, position) in handles {
+            let point = viewPoint(from: position)
+            let rect = CGRect(x: point.x - handleRadius, y: point.y - handleRadius,
+                              width: handleRadius * 2, height: handleRadius * 2)
+            context.setFillColor(NSColor.white.cgColor)
+            context.setStrokeColor(NSColor.controlAccentColor.cgColor)
+            context.setLineWidth(1.5)
+            if handle == .rotate {
+                context.fillEllipse(in: rect)
+                context.strokeEllipse(in: rect)
+            } else {
+                context.fill(rect)
+                context.stroke(rect)
+            }
+        }
+        context.restoreGState()
     }
 
     override func resetCursorRects() {
         switch document.tool {
         case .navigate:
-            addCursorRect(bounds, cursor: isPanning ? .closedHand : .openHand)
+            // Con el puntero, la mano cerrada sólo mientras se arrastra el fondo.
+            addCursorRect(bounds, cursor: isPanning ? .closedHand : .arrow)
         case .annotate:
             addCursorRect(imageFrame, cursor: .crosshair)
         }
+    }
+
+    private func refreshCursor() {
+        discardCursorRects()
+        window?.invalidateCursorRects(for: self)
     }
 
     override func layout() {
@@ -215,19 +294,15 @@ final class CanvasView: NSView {
             return
         }
 
-        // Puntero: doble clic vuelve a ajustar la captura a la ventana; arrastrar la desplaza.
+        // Puntero: selecciona, mueve, redimensiona y gira lo ya dibujado; sobre zona vacía,
+        // desplaza la captura.
         if document.tool == .navigate {
-            if event.clickCount == 2 {
-                zoomToFit()
-                return
-            }
-            isPanning = true
-            panAnchor = convert(event.locationInWindow, from: nil)
-            panOffsetAtDragStart = panOffset
-            discardCursorRects()
-            window?.invalidateCursorRects(for: self)
+            handlePointerMouseDown(event)
             return
         }
+
+        // Con una herramienta de dibujo, empezar un trazo nuevo deselecciona lo anterior.
+        document.select(nil)
 
         guard let tool = document.tool.annotationTool else { return }
 
@@ -248,7 +323,59 @@ final class CanvasView: NSView {
         }
     }
 
+    /// Reparte el clic del puntero entre tirador, anotación y fondo.
+    private func handlePointerMouseDown(_ event: NSEvent) {
+        let viewLocation = convert(event.locationInWindow, from: nil)
+        let imageLocation = imagePoint(from: viewLocation)
+        let tolerance = handleTolerance
+
+        // 1. Un tirador de la selección actual tiene prioridad sobre todo lo demás.
+        if let selected = document.selectedAnnotation,
+           let handle = selected.handle(at: imageLocation, tolerance: tolerance) {
+            document.beginInteractiveChange()
+            manipulation = handle == .rotate
+                ? .rotating(id: selected.id)
+                : .resizing(id: selected.id, handle: handle)
+            return
+        }
+
+        // 2. ¿Hay una anotación bajo el cursor?
+        if let hit = document.annotation(at: imageLocation, tolerance: tolerance) {
+            document.select(hit.id)
+
+            if event.clickCount == 2 {
+                beginEditing(hit)
+                return
+            }
+
+            document.beginInteractiveChange()
+            manipulation = .moving(id: hit.id, grabPoint: imageLocation, original: hit)
+            return
+        }
+
+        // 3. Fondo: se deselecciona y se desplaza la captura.
+        document.select(nil)
+        if event.clickCount == 2 {
+            zoomToFit()
+            return
+        }
+        isPanning = true
+        panAnchor = viewLocation
+        panOffsetAtDragStart = panOffset
+        refreshCursor()
+    }
+
+    /// Tolerancia de acierto en coordenadas de imagen: constante en pantalla, sea cual sea el zoom.
+    private var handleTolerance: CGFloat {
+        max(handleRadius + 3, 9) / max(displayScale, 0.0001)
+    }
+
     override func mouseDragged(with event: NSEvent) {
+        if let manipulation {
+            applyManipulation(manipulation, with: event)
+            return
+        }
+
         if isPanning, let anchor = panAnchor {
             let current = convert(event.locationInWindow, from: nil)
             panOffset = CGPoint(x: panOffsetAtDragStart.x + current.x - anchor.x,
@@ -279,12 +406,39 @@ final class CanvasView: NSView {
         needsDisplay = true
     }
 
+    /// Aplica el arrastre en curso sobre la anotación seleccionada.
+    private func applyManipulation(_ manipulation: Manipulation, with event: NSEvent) {
+        let imageLocation = imagePoint(from: convert(event.locationInWindow, from: nil))
+        let shiftPressed = event.modifierFlags.contains(.shift)
+
+        switch manipulation {
+        case let .moving(id, grabPoint, original):
+            guard document.annotations.contains(where: { $0.id == id }) else { return }
+            let delta = CGSize(width: imageLocation.x - grabPoint.x,
+                               height: imageLocation.y - grabPoint.y)
+            document.updateLive(original.moved(by: delta))
+        case let .resizing(id, handle):
+            guard let annotation = document.annotations.first(where: { $0.id == id }) else { return }
+            document.updateLive(annotation.resized(handle: handle, to: imageLocation, keepingAspect: shiftPressed))
+        case let .rotating(id):
+            guard let annotation = document.annotations.first(where: { $0.id == id }) else { return }
+            document.updateLive(annotation.rotated(towards: imageLocation, snapping: shiftPressed))
+        }
+        needsDisplay = true
+    }
+
     override func mouseUp(with event: NSEvent) {
+        if manipulation != nil {
+            manipulation = nil
+            document.endInteractiveChange()
+            refreshCursor()
+            return
+        }
+
         if isPanning {
             isPanning = false
             panAnchor = nil
-            discardCursorRects()
-            window?.invalidateCursorRects(for: self)
+            refreshCursor()
             return
         }
 
@@ -359,14 +513,96 @@ final class CanvasView: NSView {
         }
     }
 
+    // MARK: - Edición del contenido (doble clic)
+
+    /// Doble clic sobre una anotación: cambia su número si es un contador, o su texto si lo es.
+    private func beginEditing(_ annotation: Annotation) {
+        if annotation.counterNumber != nil {
+            beginCounterEditing(annotation)
+        } else if annotation.textContent != nil {
+            beginTextEditing(editing: annotation)
+        }
+    }
+
+    /// Campo para renumerar un contador. Permite poner cualquier número, no sólo el siguiente
+    /// de la serie: si hay 1, 2 y 3, el cuarto puede ser el 8.
+    private func beginCounterEditing(_ annotation: Annotation) {
+        commitCounterEditor()
+        commitTextEditor()
+
+        guard let number = annotation.counterNumber else { return }
+        let radius = AnnotationRenderer.counterRadius(for: annotation.style) * displayScale
+        let centerInView = viewPoint(from: annotation.center)
+        let width = max(radius * 2.2, 46)
+        let height = max(radius * 1.3, 22)
+
+        let field = NSTextField(frame: CGRect(x: centerInView.x - width / 2,
+                                              y: centerInView.y - height / 2,
+                                              width: width,
+                                              height: height))
+        field.stringValue = "\(number)"
+        field.alignment = .center
+        field.font = .systemFont(ofSize: min(max(radius * 0.9, 11), 28), weight: .bold)
+        field.isBordered = true
+        field.bezelStyle = .roundedBezel
+        field.focusRingType = .default
+        field.delegate = self
+        field.formatter = CounterNumberFormatter()
+
+        addSubview(field)
+        window?.makeFirstResponder(field)
+        field.currentEditor()?.selectAll(nil)
+
+        counterEditor = field
+        counterEditorAnnotationID = annotation.id
+    }
+
+    @discardableResult
+    func commitCounterEditor() -> Bool {
+        guard let field = counterEditor, let id = counterEditorAnnotationID else { return false }
+        let value = Int(field.stringValue.trimmingCharacters(in: .whitespaces))
+        counterEditor = nil
+        counterEditorAnnotationID = nil
+        field.removeFromSuperview()
+        window?.makeFirstResponder(self)
+
+        if let value {
+            document.setCounterNumber(value, for: id)
+        }
+        needsDisplay = true
+        return true
+    }
+
+    func cancelCounterEditor() {
+        guard let field = counterEditor else { return }
+        counterEditor = nil
+        counterEditorAnnotationID = nil
+        field.removeFromSuperview()
+        window?.makeFirstResponder(self)
+        needsDisplay = true
+    }
+
+    var isEditingCounter: Bool { counterEditor != nil }
+
     // MARK: - Texto en línea
 
     var isEditingText: Bool { textEditor != nil }
 
-    private func beginTextEditing(at point: CGPoint) {
+    /// Reedita un texto ya existente.
+    private func beginTextEditing(editing annotation: Annotation) {
+        guard case let .text(origin, string) = annotation.shape else { return }
+        commitTextEditor()
+        commitCounterEditor()
+        beginTextEditing(at: origin, style: annotation.style, existing: string, annotationID: annotation.id)
+    }
+
+    private func beginTextEditing(at point: CGPoint,
+                                  style overrideStyle: AnnotationStyle? = nil,
+                                  existing: String = "",
+                                  annotationID: UUID? = nil) {
         commitTextEditor()
 
-        let style = document.currentStyle
+        let style = overrideStyle ?? document.currentStyle
         let scale = displayScale
         // El campo de edición usa la misma escala que el lienzo, de modo que el texto que se
         // escribe tiene el tamaño exacto con el que se va a dibujar.
@@ -381,11 +617,16 @@ final class CanvasView: NSView {
         editor.onCommit = { [weak self] in self?.commitTextEditor() }
         editor.onCancel = { [weak self] in self?.cancelTextEditor() }
 
+        editor.string = existing
         addSubview(editor)
         window?.makeFirstResponder(editor)
+        if !existing.isEmpty {
+            editor.setSelectedRange(NSRange(location: 0, length: (existing as NSString).length))
+        }
 
         textEditor = editor
         textEditorOrigin = point
+        textEditorAnnotationID = annotationID
     }
 
     /// Confirma el texto en edición convirtiéndolo en anotación.
@@ -393,12 +634,27 @@ final class CanvasView: NSView {
     func commitTextEditor() -> Bool {
         guard let editor = textEditor, let origin = textEditorOrigin else { return false }
         let string = editor.string
+        let annotationID = textEditorAnnotationID
         textEditor = nil
         textEditorOrigin = nil
+        textEditorAnnotationID = nil
         editor.removeFromSuperview()
         window?.makeFirstResponder(self)
 
         let trimmed = string.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        if let annotationID, let existing = document.annotations.first(where: { $0.id == annotationID }) {
+            // Reedición: un texto vaciado equivale a borrar la anotación.
+            if trimmed.isEmpty {
+                document.select(annotationID)
+                document.deleteSelected()
+            } else {
+                document.replace(existing.withText(string))
+            }
+            needsDisplay = true
+            return true
+        }
+
         guard !trimmed.isEmpty else { return false }
         document.add(Annotation(shape: .text(origin: origin, string: string), style: document.currentStyle))
         needsDisplay = true
@@ -409,6 +665,7 @@ final class CanvasView: NSView {
         guard let editor = textEditor else { return }
         textEditor = nil
         textEditorOrigin = nil
+        textEditorAnnotationID = nil
         editor.removeFromSuperview()
         window?.makeFirstResponder(self)
         needsDisplay = true
@@ -417,12 +674,82 @@ final class CanvasView: NSView {
     // MARK: - Teclado
 
     override func keyDown(with event: NSEvent) {
-        // Retroceso elimina la última anotación; Esc cierra el editor (lo gestiona la ventana).
+        // Retroceso: borra lo seleccionado, o la última anotación si no hay nada elegido.
         if event.keyCode == 51 || event.keyCode == 117 { // Delete / Fn+Delete
-            document.removeLast()
+            if document.selectedAnnotation != nil {
+                document.deleteSelected()
+            } else {
+                document.removeLast()
+            }
             return
         }
+
+        // Las flechas mueven la anotación seleccionada; con Mayúsculas, a pasos mayores.
+        if let selected = document.selectedAnnotation, let delta = arrowDelta(for: event) {
+            document.beginInteractiveChange()
+            document.updateLive(selected.moved(by: delta))
+            document.endInteractiveChange()
+            needsDisplay = true
+            return
+        }
+
         super.keyDown(with: event)
+    }
+
+    private func arrowDelta(for event: NSEvent) -> CGSize? {
+        let step: CGFloat = event.modifierFlags.contains(.shift) ? 10 : 1
+        switch event.keyCode {
+        case 123: return CGSize(width: -step, height: 0) // ←
+        case 124: return CGSize(width: step, height: 0)  // →
+        case 125: return CGSize(width: 0, height: -step) // ↓
+        case 126: return CGSize(width: 0, height: step)  // ↑
+        default: return nil
+        }
+    }
+}
+
+// MARK: - Campo del número de un contador
+
+extension CanvasView: NSTextFieldDelegate {
+    func controlTextDidEndEditing(_ notification: Notification) {
+        guard (notification.object as? NSTextField) === counterEditor else { return }
+        commitCounterEditor()
+    }
+
+    func control(_ control: NSControl, textView: NSTextView, doCommandBy selector: Selector) -> Bool {
+        guard control === counterEditor else { return false }
+        switch selector {
+        case #selector(NSResponder.insertNewline(_:)):
+            commitCounterEditor()
+            return true
+        case #selector(NSResponder.cancelOperation(_:)):
+            cancelCounterEditor()
+            return true
+        default:
+            return false
+        }
+    }
+}
+
+/// Sólo admite números enteros no negativos, para que un contador no acabe con texto suelto.
+private final class CounterNumberFormatter: NumberFormatter, @unchecked Sendable {
+    override init() {
+        super.init()
+        numberStyle = .none
+        allowsFloats = false
+        minimum = 0
+        maximum = 9999
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) no está soportado")
+    }
+
+    override func isPartialStringValid(_ partialString: String,
+                                       newEditingString newString: AutoreleasingUnsafeMutablePointer<NSString?>?,
+                                       errorDescription error: AutoreleasingUnsafeMutablePointer<NSString?>?) -> Bool {
+        partialString.isEmpty || partialString.allSatisfy(\.isNumber)
     }
 }
 
