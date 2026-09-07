@@ -66,13 +66,23 @@ propio de 1024×1024, usa `Tools/make-appicon.sh logo-1024.png`.
 
 ### Firma
 
-El proyecto está configurado con `DEVELOPMENT_TEAM = TU_TEAM_ID` y firma manual. Si compilas
-con otra cuenta de desarrollador, cambia ese valor en los ajustes del target (o en
-`Tempo.xcodeproj/project.pbxproj`).
+Por omisión el proyecto se firma de forma **ad‑hoc**: se compila y se ejecuta sin necesidad de
+ninguna cuenta de desarrollador.
 
-Firmar con un certificado de desarrollo real —en lugar de firma ad‑hoc— importa aquí: macOS
-asocia el permiso de grabación de pantalla a la identidad de la app, así que **no tendrás que
-volver a concederlo cada vez que recompiles**.
+Si tienes un certificado de desarrollo, merece la pena usarlo: macOS asocia el permiso de
+grabación de pantalla a la identidad de la app, así que **no tendrás que volver a concederlo
+cada vez que recompiles**. Para ello crea `Config/Local.xcconfig` (está ignorado por git):
+
+```
+CODE_SIGN_IDENTITY = Apple Development
+DEVELOPMENT_TEAM = TU_TEAM_ID
+```
+
+Tu Team ID es el campo `OU` del certificado:
+
+```bash
+security find-certificate -c "Apple Development" -p | openssl x509 -noout -subject
+```
 
 ---
 
