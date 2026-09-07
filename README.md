@@ -1,0 +1,208 @@
+# Snapper
+
+Utilidad de captura de pantalla para macOS pensada para un flujo concreto: **capturar, anotar
+rápido y arrastrar la imagen a un chat de IA** (ChatGPT, Claude, o cualquier otra aplicación
+que acepte imágenes) sin pasos intermedios.
+
+No integra ninguna API de inteligencia artificial. La conexión con el LLM ocurre donde ya
+estás trabajando: arrastrando la miniatura, o pegando con ⌘V.
+
+> Estado: MVP funcional para uso personal. Sin distribución, sin actualizaciones automáticas,
+> sin cuentas y sin telemetría.
+
+---
+
+## El flujo
+
+1. Pulsas un atajo global y capturas la pantalla completa o una región.
+2. Aparece una **miniatura flotante** en la esquina inferior derecha, por encima de todo lo
+   demás y sin robarte el foco.
+3. Desde ahí puedes:
+   - **Arrastrarla** directamente al navegador o a una app de escritorio.
+   - **Hacer clic** para abrir el editor y anotarla.
+   - **Cerrarla** con la ✕ que aparece al pasar el ratón por encima.
+4. En el editor anotas y terminas con **Copiar** (⌘C) o **Guardar** (⌘S).
+5. Si cierras el editor sin descartar (⌘W o Esc), la captura **vuelve a ser miniatura** y
+   sigue disponible para arrastrarla más tarde.
+
+Puedes tener varias capturas vivas a la vez: las miniaturas se apilan en la esquina.
+
+---
+
+## Requisitos
+
+- macOS 14 o posterior (el proyecto está probado en macOS 26.6, Apple Silicon).
+- Xcode 16 o posterior (probado con Xcode 26.6).
+- Una identidad de firma de desarrollo en el llavero (el proyecto usa firma manual con
+  `Apple Development`).
+
+## Compilar y ejecutar
+
+```bash
+git clone <este-repositorio>
+cd Snapper
+xcodebuild -project Snapper.xcodeproj -scheme Snapper -configuration Release build
+open ~/Library/Developer/Xcode/DerivedData/Snapper-*/Build/Products/Release/Snapper.app
+```
+
+O simplemente abre `Snapper.xcodeproj` en Xcode y pulsa ⌘R.
+
+Para dejarla instalada de forma permanente, copia el `.app` a `/Applications` y añádela a
+**Ajustes del Sistema › General › Ítems de inicio** si quieres que arranque con el Mac.
+
+### Firma
+
+El proyecto está configurado con `DEVELOPMENT_TEAM = TU_TEAM_ID` y firma manual. Si compilas
+con otra cuenta de desarrollador, cambia ese valor en los ajustes del target (o en
+`Snapper.xcodeproj/project.pbxproj`).
+
+Firmar con un certificado de desarrollo real —en lugar de firma ad‑hoc— importa aquí: macOS
+asocia el permiso de grabación de pantalla a la identidad de la app, así que **no tendrás que
+volver a concederlo cada vez que recompiles**.
+
+---
+
+## Permisos de macOS
+
+Snapper necesita **Grabación de pantalla**:
+
+> Ajustes del Sistema › Privacidad y seguridad › Grabación de pantalla → activar *Snapper*
+
+La primera vez que arranca, la app lo solicita automáticamente. Si lo concedes con la app ya
+abierta, **ciérrala y vuelve a abrirla** para que el sistema aplique el cambio.
+
+No necesita permiso de Accesibilidad: los atajos globales usan `RegisterEventHotKey`, que el
+sistema entrega directamente a la aplicación.
+
+Puedes comprobar el estado desde el menú de la barra superior, o ejecutando:
+
+```bash
+/ruta/a/Snapper.app/Contents/MacOS/Snapper --self-check
+```
+
+---
+
+## Atajos
+
+### Globales (funcionan con cualquier aplicación en primer plano)
+
+| Acción | Atajo |
+|---|---|
+| Capturar la pantalla completa | `⌥⇧⌘F` |
+| Seleccionar y capturar una región | `⌥⇧⌘S` |
+
+Durante la selección de región: arrastra para definir la zona (se muestra el tamaño en píxeles),
+`Esc` o clic derecho para cancelar. Un clic sin arrastre también cancela.
+
+### Editor
+
+| Herramienta | Tecla |
+|---|---|
+| Flecha | `A` |
+| Rectángulo | `R` |
+| Elipse / círculo | `O` |
+| Texto | `T` |
+| Lápiz | `P` |
+| Blur (censura) | `B` |
+| Contador numerado | `C` |
+
+| Acción | Atajo |
+|---|---|
+| Deshacer / Rehacer | `⌘Z` / `⇧⌘Z` |
+| Borrar la última anotación | `⌫` |
+| Elegir color | `1` … `8` |
+| Grosor y tamaño de texto | `[` / `]` |
+| Copiar con anotaciones | `⌘C` |
+| Guardar como PNG | `⌘S` |
+| Volver a la miniatura | `⌘W` o `Esc` |
+| Descartar la captura | `⇧⌘⌫` |
+
+Todos los atajos están visibles en la propia interfaz: la tecla de cada herramienta aparece en
+su botón, y el botón **?** de la barra abre la lista completa.
+
+Con `⇧` mantenido al dibujar: cuadrados y círculos perfectos, y flechas en ángulos de 45°.
+
+---
+
+## Herramientas del editor
+
+- **Flecha**, **rectángulo**, **elipse** y **lápiz** con color y grosor configurables.
+- **Texto**: se escribe en el sitio, con el color y el tamaño activos. `↩` confirma, `⌥↩`
+  añade una línea, `Esc` cancela.
+- **Blur**: difumina la región seleccionada para censurar datos sensibles.
+- **Contadores**: círculos numerados que se autoincrementan (1, 2, 3…). Al deshacer, la
+  numeración vuelve atrás sola.
+
+**Copiar** deja la imagen final en el portapapeles (PNG y TIFF) y cierra la captura: ya puedes
+pegarla con ⌘V. **Guardar** abre el panel nativo de macOS; si lo cancelas, la captura sigue
+intacta y disponible.
+
+---
+
+## Estructura del proyecto
+
+```
+Snapper/
+├── App/          Ciclo de vida, menús, coordinación del flujo y sesiones de captura
+├── Capture/      ScreenCaptureKit y capa de selección de región
+├── Models/       Anotaciones, colores, imagen capturada y estado del editor (undo/redo)
+├── Editor/       Ventana del editor, lienzo, barra de herramientas y renderizador
+├── Thumbnail/    Panel flotante y arrastre a otras aplicaciones
+├── Services/     Atajos globales, exportación (portapapeles/disco) y avisos
+└── Resources/    Catálogo de recursos e icono de la app
+SnapperTests/     Pruebas del núcleo (42 pruebas)
+Tools/            Utilidades de desarrollo
+```
+
+### Decisiones técnicas
+
+- **Un solo renderizador.** `AnnotationRenderer` dibuja tanto en el lienzo como en la imagen
+  exportada, sobre el mismo sistema de coordenadas. Lo que ves es exactamente lo que se copia
+  o se guarda; no hay dos caminos que puedan divergir.
+- **Coordenadas lógicas.** Las anotaciones viven en puntos, no en píxeles. Al exportar se
+  escala por el factor Retina de la pantalla de origen, así que una captura en un monitor 2×
+  se guarda a resolución completa sin que el editor tenga que saber nada de ello.
+- **La sesión es la dueña de la captura.** La miniatura y el editor son sólo dos formas de
+  mostrar la misma sesión, por eso cerrar el editor nunca destruye el trabajo.
+- **`RegisterEventHotKey` (Carbon)** para los atajos globales, en lugar de monitores de
+  eventos: es la vía que no exige permiso de Accesibilidad.
+- **`SCScreenshotManager` (ScreenCaptureKit)** para capturar, excluyendo siempre la propia
+  aplicación del filtro para que la miniatura y la capa de selección no salgan en la imagen.
+- **Sin sandbox**, para que el panel de guardar y el arrastre funcionen sin restricciones en
+  un uso personal.
+
+---
+
+## Pruebas
+
+```bash
+xcodebuild -project Snapper.xcodeproj -scheme Snapper test
+```
+
+Cubren el estado del editor (historial, numeración automática, descarte de gestos vacíos), el
+renderizado de todas las herramientas, la conservación de la resolución Retina, la conversión
+de coordenadas entre AppKit y ScreenCaptureKit, y la salida a portapapeles y disco.
+
+Para comprobar el camino real —captura de pantalla incluida— en este Mac:
+
+```bash
+/ruta/a/Snapper.app/Contents/MacOS/Snapper --self-check
+```
+
+---
+
+## Privacidad
+
+Todo ocurre en local. Las capturas no se suben a ningún sitio, no hay cuentas, no hay
+telemetría y no hay historial sincronizado. Los archivos temporales que se crean para poder
+arrastrar la imagen viven en el directorio temporal del sistema y se borran al cerrar la
+captura y al arrancar la aplicación.
+
+## Limitaciones conocidas
+
+- No hay selección ni edición de anotaciones ya creadas: se corrigen con `⌘Z` o `⌫`.
+- No hay zoom ni desplazamiento en el editor; la captura se ajusta a la ventana.
+- No hay captura de ventana concreta ni con retardo, ni captura con scroll.
+- Los atajos globales son fijos (no configurables desde la interfaz); se definen en
+  `Snapper/Services/HotKeyManager.swift`.
+- La app no está notarizada: es para uso personal en este Mac.
