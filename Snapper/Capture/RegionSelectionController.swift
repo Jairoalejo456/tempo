@@ -127,6 +127,7 @@ private final class SelectionOverlayView: NSView {
     private var anchor: CGPoint?
     private var current: CGPoint?
     private var pointerLocation: CGPoint = .zero
+    private var trackingArea: NSTrackingArea?
 
     private var selectionRect: CGRect? {
         guard let anchor, let current else { return nil }
@@ -149,9 +150,25 @@ private final class SelectionOverlayView: NSView {
         NSCursor.crosshair.set()
     }
 
+    /// Se sigue el ratón con un área de seguimiento activa siempre: las ventanas que no son
+    /// la principal no reciben `mouseMoved`, y sin esto la cruz no aparecería en el resto
+    /// de monitores.
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let trackingArea { removeTrackingArea(trackingArea) }
+        let area = NSTrackingArea(rect: bounds,
+                                  options: [.mouseMoved, .activeAlways, .inVisibleRect],
+                                  owner: self)
+        addTrackingArea(area)
+        trackingArea = area
+    }
+
     // MARK: Eventos
 
     override func mouseDown(with event: NSEvent) {
+        // Al empezar a seleccionar en otro monitor, esa ventana pasa a ser la principal
+        // para que Esc siga cancelando.
+        window?.makeKey()
         anchor = convert(event.locationInWindow, from: nil)
         current = anchor
         needsDisplay = true

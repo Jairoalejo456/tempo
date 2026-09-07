@@ -65,6 +65,29 @@ final class AppCoordinator: NSObject {
         let session = CaptureSession(capture: capture, screen: screen)
         sessions.append(session)
         showThumbnail(for: session)
+        prewarmDragFile(for: session)
+    }
+
+    /// Componer una pantalla completa Retina cuesta unos milisegundos que se notarían justo
+    /// al empezar a arrastrar, así que el archivo se prepara en segundo plano en cuanto la
+    /// captura existe. Si el usuario anota algo, se regenera bajo demanda.
+    private func prewarmDragFile(for session: CaptureSession) {
+        let capture = session.document.capture
+        let date = capture.createdAt
+        DispatchQueue.global(qos: .userInitiated).async {
+            guard let image = try? ImageExporter.compose(capture: capture, annotations: []),
+                  let url = try? ImageExporter.writeTemporaryFile(image: image, date: date) else { return }
+            DispatchQueue.main.async {
+                // Si entretanto se anotó o se cerró la captura, el archivo ya no sirve.
+                guard session.dragFileURL == nil, session.document.annotations.isEmpty,
+                      self.sessions.contains(where: { $0.id == session.id }) else {
+                    try? FileManager.default.removeItem(at: url)
+                    return
+                }
+                session.dragFileURL = url
+                session.dragFileAnnotations = []
+            }
+        }
     }
 
     @MainActor
@@ -188,22 +211,6 @@ final class AppCoordinator: NSObject {
         }
     }
 
-    @MainActor
-    func copyActiveSession() {
-        guard let session = frontmostSession() else { return }
-        copy(session)
-    }
-
-    @MainActor
-    func saveActiveSession() {
-        guard let session = frontmostSession() else { return }
-        save(session)
-    }
-
-    private func frontmostSession() -> CaptureSession? {
-        sessions.first { $0.isEditorVisible } ?? sessions.last
-    }
-
     // MARK: - Cierre
 
     @MainActor
@@ -323,6 +330,16 @@ extension AppCoordinator: ThumbnailWindowDelegate {
 
     func thumbnailDidFinishDrag(_ controller: ThumbnailWindowController, accepted: Bool) {
         // La miniatura se conserva tras arrastrar para poder soltarla en varios sitios.
+    }
+
+    func thumbnailRequestedCopy(_ controller: ThumbnailWindowController) {
+        guard let session = session(with: controller.sessionID) else { return }
+        Task { @MainActor in self.copy(session) }
+    }
+
+    func thumbnailRequestedSave(_ controller: ThumbnailWindowController) {
+        guard let session = session(with: controller.sessionID) else { return }
+        Task { @MainActor in self.save(session) }
     }
 }
 

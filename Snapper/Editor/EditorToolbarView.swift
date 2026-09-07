@@ -125,7 +125,6 @@ struct EditorToolbarView: View {
                 Label("Guardar", systemImage: "square.and.arrow.down")
             }
             .help("Guardar como PNG · ⌘S")
-            .keyboardShortcut(.defaultAction)
         }
         .controlSize(.regular)
     }

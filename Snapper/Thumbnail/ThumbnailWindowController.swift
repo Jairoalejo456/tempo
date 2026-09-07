@@ -9,6 +9,10 @@ protocol ThumbnailWindowDelegate: AnyObject {
     func thumbnailFileURLForDragging(_ controller: ThumbnailWindowController) -> URL?
     /// El arrastre terminó copiando la imagen en otra aplicación.
     func thumbnailDidFinishDrag(_ controller: ThumbnailWindowController, accepted: Bool)
+    /// Copiar la imagen sin pasar por el editor.
+    func thumbnailRequestedCopy(_ controller: ThumbnailWindowController)
+    /// Guardar la imagen sin pasar por el editor.
+    func thumbnailRequestedSave(_ controller: ThumbnailWindowController)
 }
 
 /// Panel flotante compacto que aparece tras cada captura.
@@ -104,6 +108,8 @@ final class ThumbnailWindowController: NSWindowController {
     // MARK: - Puente con la vista
 
     fileprivate func requestOpen() { delegate?.thumbnailRequestedOpen(self) }
+    fileprivate func requestCopy() { delegate?.thumbnailRequestedCopy(self) }
+    fileprivate func requestSave() { delegate?.thumbnailRequestedSave(self) }
     fileprivate func requestDismiss() { delegate?.thumbnailRequestedDismiss(self) }
     fileprivate func fileURLForDragging() -> URL? { delegate?.thumbnailFileURLForDragging(self) }
     fileprivate func dragFinished(accepted: Bool) { delegate?.thumbnailDidFinishDrag(self, accepted: accepted) }
@@ -207,6 +213,25 @@ private final class ThumbnailView: NSView, NSDraggingSource {
         guard !isDragging, mouseDownLocation != nil else { return }
         controller?.requestOpen()
     }
+
+    override func rightMouseDown(with event: NSEvent) {
+        let menu = NSMenu()
+        menu.addItem(withTitle: "Abrir editor", action: #selector(menuOpen), keyEquivalent: "")
+        menu.addItem(.separator())
+        menu.addItem(withTitle: "Copiar", action: #selector(menuCopy), keyEquivalent: "")
+        menu.addItem(withTitle: "Guardar como PNG…", action: #selector(menuSave), keyEquivalent: "")
+        menu.addItem(.separator())
+        menu.addItem(withTitle: "Descartar", action: #selector(menuDismiss), keyEquivalent: "")
+        for item in menu.items where item.action != nil {
+            item.target = self
+        }
+        NSMenu.popUpContextMenu(menu, with: event, for: self)
+    }
+
+    @objc private func menuOpen() { controller?.requestOpen() }
+    @objc private func menuCopy() { controller?.requestCopy() }
+    @objc private func menuSave() { controller?.requestSave() }
+    @objc private func menuDismiss() { controller?.requestDismiss() }
 
     private func beginImageDrag(with event: NSEvent) {
         guard let url = controller?.fileURLForDragging() else {

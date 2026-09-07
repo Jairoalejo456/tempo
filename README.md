@@ -21,7 +21,9 @@ estás trabajando: arrastrando la miniatura, o pegando con ⌘V.
    - **Arrastrarla** directamente al navegador o a una app de escritorio.
    - **Hacer clic** para abrir el editor y anotarla.
    - **Cerrarla** con la ✕ que aparece al pasar el ratón por encima.
-4. En el editor anotas y terminas con **Copiar** (⌘C) o **Guardar** (⌘S).
+4. En el editor anotas y terminas con **Copiar** (⌘C) o **Guardar** (⌘S). Si no necesitas
+   anotar nada, el clic derecho sobre la miniatura ofrece copiar, guardar o descartar
+   directamente.
 5. Si cierras el editor sin descartar (⌘W o Esc), la captura **vuelve a ser miniatura** y
    sigue disponible para arrastrarla más tarde.
 
