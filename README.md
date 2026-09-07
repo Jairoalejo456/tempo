@@ -189,6 +189,16 @@ Para comprobar el camino real —captura de pantalla incluida— en este Mac:
 /ruta/a/Snapper.app/Contents/MacOS/Snapper --self-check
 ```
 
+Comprueba el permiso, hace una captura completa y una de región, aplica las siete herramientas,
+verifica la numeración de contadores y el historial, compone a resolución nativa, copia al
+portapapeles y escribe un PNG en disco.
+
+Y para revisar de un vistazo cómo se dibuja cada herramienta, sin necesidad de capturar nada:
+
+```bash
+/ruta/a/Snapper.app/Contents/MacOS/Snapper --render-sample ~/Desktop/muestra.png
+```
+
 ---
 
 ## Privacidad
