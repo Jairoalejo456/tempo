@@ -64,7 +64,10 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSMenu
             onUndo: { [weak self] in self?.undoEdit(nil) },
             onRedo: { [weak self] in self?.redoEdit(nil) },
             onCopy: { [weak self] in self?.copyImage(nil) },
-            onSave: { [weak self] in self?.saveImage(nil) }
+            onSave: { [weak self] in self?.saveImage(nil) },
+            onZoomIn: { [weak self] in self?.canvas.zoomIn() },
+            onZoomOut: { [weak self] in self?.canvas.zoomOut() },
+            onZoomToFit: { [weak self] in self?.canvas.zoomToFit() }
         )
         let hosting = NSHostingView(rootView: toolbar)
         hosting.translatesAutoresizingMaskIntoConstraints = false
@@ -141,6 +144,22 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSMenu
         editorDocument.redo()
     }
 
+    @IBAction func zoomIn(_ sender: Any?) {
+        canvas.zoomIn()
+    }
+
+    @IBAction func zoomOut(_ sender: Any?) {
+        canvas.zoomOut()
+    }
+
+    @IBAction func zoomToFit(_ sender: Any?) {
+        canvas.zoomToFit()
+    }
+
+    @IBAction func zoomToActualSize(_ sender: Any?) {
+        canvas.zoomToActualSize()
+    }
+
     @IBAction func returnToThumbnail(_ sender: Any?) {
         editorDelegate?.editorRequestedReturnToThumbnail(self)
     }
@@ -193,7 +212,7 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSMenu
         guard modifiers.isEmpty || modifiers == .shift else { return false }
         guard let characters = event.charactersIgnoringModifiers?.lowercased(), !characters.isEmpty else { return false }
 
-        if let tool = AnnotationTool.allCases.first(where: { $0.shortcutKey == characters }) {
+        if let tool = EditorTool.allCases.first(where: { $0.shortcutKey == characters }) {
             editorDocument.tool = tool
             return true
         }

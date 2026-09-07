@@ -9,13 +9,26 @@ final class EditorDocument: ObservableObject {
     let id = UUID()
 
     @Published private(set) var annotations: [Annotation] = []
-    @Published var tool: AnnotationTool = .arrow
+
+    /// Herramienta activa. El editor abre siempre en modo puntero: mirar la captura y moverse
+    /// por ella no debe ensuciarla con una anotación accidental al primer clic.
+    @Published var tool: EditorTool = .navigate
     @Published var color: AnnotationColor = .red
     @Published var lineWidth: CGFloat = 4
     @Published var fontSize: CGFloat = 28
 
     /// Anotación que se está creando con el ratón; se dibuja pero aún no forma parte del historial.
     @Published var draft: Annotation?
+
+    // MARK: - Presentación
+
+    /// Zoom aplicado por el usuario, relativo al ajuste a la ventana (1 = ajustada).
+    @Published var zoomFactor: CGFloat = 1
+    /// Escala a la que la captura cabe en la ventana; la calcula el lienzo.
+    @Published var fitScale: CGFloat = 1
+
+    /// Zoom efectivo respecto al tamaño real de la captura, que es lo que se muestra al usuario.
+    var effectiveZoom: CGFloat { fitScale * zoomFactor }
 
     // Publicadas para que la barra de herramientas active o desactive los botones al instante.
     @Published private var undoStack: [[Annotation]] = []

@@ -13,6 +13,7 @@ enum MainMenu {
         main.addItem(applicationMenuItem())
         main.addItem(captureMenuItem())
         main.addItem(editMenuItem())
+        main.addItem(viewMenuItem())
         main.addItem(toolsMenuItem())
 
         return main
@@ -24,7 +25,10 @@ enum MainMenu {
         let item = NSMenuItem()
         let menu = NSMenu(title: "Tempo")
 
-        menu.addItem(withTitle: "Acerca de Tempo", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
+        menu.addItem(withTitle: "Acerca de Tempo", action: #selector(AppDelegate.showAbout(_:)), keyEquivalent: "")
+        menu.addItem(.separator())
+        let settings = menu.addItem(withTitle: "Ajustes…", action: #selector(AppDelegate.showPreferences(_:)), keyEquivalent: ",")
+        settings.keyEquivalentModifierMask = [.command]
         menu.addItem(.separator())
         menu.addItem(withTitle: "Ocultar Tempo", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
         menu.addItem(.separator())
@@ -101,13 +105,29 @@ enum MainMenu {
         return item
     }
 
+    // MARK: - Visualización
+
+    private static func viewMenuItem() -> NSMenuItem {
+        let item = NSMenuItem()
+        let menu = NSMenu(title: "Visualización")
+
+        menu.addItem(withTitle: "Acercar", action: #selector(EditorWindowController.zoomIn(_:)), keyEquivalent: "+")
+        menu.addItem(withTitle: "Alejar", action: #selector(EditorWindowController.zoomOut(_:)), keyEquivalent: "-")
+        menu.addItem(.separator())
+        menu.addItem(withTitle: "Ajustar a la ventana", action: #selector(EditorWindowController.zoomToFit(_:)), keyEquivalent: "0")
+        menu.addItem(withTitle: "Tamaño real", action: #selector(EditorWindowController.zoomToActualSize(_:)), keyEquivalent: "1")
+
+        item.submenu = menu
+        return item
+    }
+
     // MARK: - Herramientas (informativo: los atajos los gestiona el editor)
 
     private static func toolsMenuItem() -> NSMenuItem {
         let item = NSMenuItem()
         let menu = NSMenu(title: "Herramientas")
 
-        for tool in AnnotationTool.allCases {
+        for tool in EditorTool.allCases {
             let entry = NSMenuItem(title: "\(tool.title)  ·  \(tool.shortcutKey.uppercased())", action: nil, keyEquivalent: "")
             entry.isEnabled = false
             menu.addItem(entry)

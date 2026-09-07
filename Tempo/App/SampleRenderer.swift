@@ -27,7 +27,7 @@ enum SampleRenderer {
     }
 
     /// Lienzo que imita una ventana cualquiera, para ver las anotaciones sobre contenido real.
-    private static func makeSyntheticCapture(scale: CGFloat = 2) -> CaptureImage {
+    static func makeSyntheticCapture(scale: CGFloat = 2) -> CaptureImage {
         let width: CGFloat = 720
         let height: CGFloat = 460
         let context = CGContext(data: nil,

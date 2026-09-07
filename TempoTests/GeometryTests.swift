@@ -86,9 +86,15 @@ final class GeometryTests: XCTestCase {
     }
 
     func testGlobalShortcutsAreDistinct() {
-        XCTAssertNotEqual(HotKeyManager.fullScreenShortcut.keyCode, HotKeyManager.regionShortcut.keyCode)
-        XCTAssertFalse(HotKeyManager.fullScreenShortcut.display.isEmpty)
-        XCTAssertFalse(HotKeyManager.regionShortcut.display.isEmpty)
+        XCTAssertNotEqual(GlobalShortcut.defaultFullScreen.keyCode, GlobalShortcut.defaultRegion.keyCode)
+        XCTAssertFalse(GlobalShortcut.defaultFullScreen.display.isEmpty)
+        XCTAssertFalse(GlobalShortcut.defaultRegion.display.isEmpty)
+    }
+
+    func testEveryHotKeyActionHasATitle() {
+        for action in HotKeyManager.Action.allCases {
+            XCTAssertFalse(action.title.isEmpty)
+        }
     }
 
     func testPaletteHasEightColorsForKeys1To8() {

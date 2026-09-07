@@ -15,6 +15,11 @@ final class CanvasView: NSView {
     private var gestureAnchor: CGPoint?
     private var isDrawing = false
 
+    /// Desplazamiento en curso con la herramienta puntero.
+    private var isPanning = false
+    private var panAnchor: CGPoint?
+    private var panOffsetAtDragStart: CGPoint = .zero
+
     /// Editor de texto en línea, cuando la herramienta de texto está activa.
     private var textEditor: InlineTextEditor?
     private var textEditorOrigin: CGPoint?
@@ -43,13 +48,23 @@ final class CanvasView: NSView {
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 
     private let padding: CGFloat = 16
+    /// Ampliación máxima respecto al tamaño real de la captura.
+    private let maximumScale: CGFloat = 8
 
-    /// Escala a la que se muestra la captura para caber en la ventana (nunca amplía).
-    var displayScale: CGFloat {
+    /// Desplazamiento aplicado al arrastrar con el puntero.
+    private var panOffset: CGPoint = .zero
+
+    /// Escala a la que la captura cabe entera en la ventana (nunca amplía por sí sola).
+    var fitScale: CGFloat {
         let available = bounds.insetBy(dx: padding, dy: padding).size
         let image = document.capture.logicalSize
         guard image.width > 0, image.height > 0, available.width > 0, available.height > 0 else { return 1 }
         return min(available.width / image.width, available.height / image.height, 1)
+    }
+
+    /// Escala realmente aplicada: el ajuste a ventana multiplicado por el zoom del usuario.
+    var displayScale: CGFloat {
+        fitScale * document.zoomFactor
     }
 
     /// Rectángulo, en coordenadas de la vista, donde se dibuja la captura.
@@ -57,10 +72,75 @@ final class CanvasView: NSView {
         let scale = displayScale
         let size = CGSize(width: document.capture.logicalSize.width * scale,
                           height: document.capture.logicalSize.height * scale)
-        return CGRect(x: ((bounds.width - size.width) / 2).rounded(),
-                      y: ((bounds.height - size.height) / 2).rounded(),
+        return CGRect(x: ((bounds.width - size.width) / 2 + panOffset.x).rounded(),
+                      y: ((bounds.height - size.height) / 2 + panOffset.y).rounded(),
                       width: size.width,
                       height: size.height)
+    }
+
+    // MARK: - Zoom
+
+    private var minimumZoomFactor: CGFloat { 0.2 }
+    private var maximumZoomFactor: CGFloat { max(1, maximumScale / max(fitScale, 0.0001)) }
+
+    /// Ajusta el zoom manteniendo fijo el punto de la imagen que está bajo el cursor.
+    func setZoom(_ factor: CGFloat, anchorInView anchor: CGPoint?) {
+        let clamped = min(max(factor, minimumZoomFactor), maximumZoomFactor)
+        guard abs(clamped - document.zoomFactor) > 0.0001 else { return }
+
+        let anchorPoint = anchor ?? CGPoint(x: bounds.midX, y: bounds.midY)
+        let imageAnchor = imagePoint(from: anchorPoint)
+
+        document.zoomFactor = clamped
+
+        let moved = viewPoint(from: imageAnchor)
+        panOffset.x += anchorPoint.x - moved.x
+        panOffset.y += anchorPoint.y - moved.y
+
+        clampPan()
+        refreshViewport()
+    }
+
+    func zoomIn() { setZoom(document.zoomFactor * 1.25, anchorInView: nil) }
+    func zoomOut() { setZoom(document.zoomFactor / 1.25, anchorInView: nil) }
+
+    /// Vuelve a mostrar la captura completa, centrada.
+    func zoomToFit() {
+        document.zoomFactor = 1
+        panOffset = .zero
+        refreshViewport()
+    }
+
+    /// Muestra la captura a su tamaño real (100 %).
+    func zoomToActualSize() {
+        setZoom(1 / max(fitScale, 0.0001), anchorInView: nil)
+    }
+
+    /// Evita que la captura se pierda fuera de la ventana al desplazarla.
+    private func clampPan() {
+        let size = CGSize(width: document.capture.logicalSize.width * displayScale,
+                          height: document.capture.logicalSize.height * displayScale)
+
+        if size.width <= bounds.width {
+            panOffset.x = 0
+        } else {
+            let limit = (size.width - bounds.width) / 2 + padding
+            panOffset.x = min(max(panOffset.x, -limit), limit)
+        }
+
+        if size.height <= bounds.height {
+            panOffset.y = 0
+        } else {
+            let limit = (size.height - bounds.height) / 2 + padding
+            panOffset.y = min(max(panOffset.y, -limit), limit)
+        }
+    }
+
+    private func refreshViewport() {
+        document.fitScale = fitScale
+        needsDisplay = true
+        discardCursorRects()
+        window?.invalidateCursorRects(for: self)
     }
 
     func imagePoint(from viewPoint: CGPoint) -> CGPoint {
@@ -110,14 +190,18 @@ final class CanvasView: NSView {
     }
 
     override func resetCursorRects() {
-        addCursorRect(imageFrame, cursor: .crosshair)
+        switch document.tool {
+        case .navigate:
+            addCursorRect(bounds, cursor: isPanning ? .closedHand : .openHand)
+        case .annotate:
+            addCursorRect(imageFrame, cursor: .crosshair)
+        }
     }
 
     override func layout() {
         super.layout()
-        discardCursorRects()
-        window?.invalidateCursorRects(for: self)
-        needsDisplay = true
+        clampPan()
+        refreshViewport()
     }
 
     // MARK: - Gestos
@@ -131,10 +215,26 @@ final class CanvasView: NSView {
             return
         }
 
+        // Puntero: doble clic vuelve a ajustar la captura a la ventana; arrastrar la desplaza.
+        if document.tool == .navigate {
+            if event.clickCount == 2 {
+                zoomToFit()
+                return
+            }
+            isPanning = true
+            panAnchor = convert(event.locationInWindow, from: nil)
+            panOffsetAtDragStart = panOffset
+            discardCursorRects()
+            window?.invalidateCursorRects(for: self)
+            return
+        }
+
+        guard let tool = document.tool.annotationTool else { return }
+
         let point = clamped(imagePoint(from: convert(event.locationInWindow, from: nil)))
         guard imageFrame.insetBy(dx: -2, dy: -2).contains(convert(event.locationInWindow, from: nil)) else { return }
 
-        switch document.tool {
+        switch tool {
         case .counter:
             let annotation = Annotation(shape: .counter(center: point, number: document.nextCounterNumber),
                                         style: document.currentStyle)
@@ -149,14 +249,23 @@ final class CanvasView: NSView {
     }
 
     override func mouseDragged(with event: NSEvent) {
-        guard isDrawing, let anchor = gestureAnchor else { return }
+        if isPanning, let anchor = panAnchor {
+            let current = convert(event.locationInWindow, from: nil)
+            panOffset = CGPoint(x: panOffsetAtDragStart.x + current.x - anchor.x,
+                                y: panOffsetAtDragStart.y + current.y - anchor.y)
+            clampPan()
+            needsDisplay = true
+            return
+        }
+
+        guard isDrawing, let anchor = gestureAnchor, let tool = document.tool.annotationTool else { return }
         var point = clamped(imagePoint(from: convert(event.locationInWindow, from: nil)))
 
         if event.modifierFlags.contains(.shift) {
-            point = constrained(point, from: anchor, tool: document.tool)
+            point = constrained(point, from: anchor, tool: tool)
         }
 
-        if document.tool == .pencil, case let .pencil(existing)? = document.draft?.shape {
+        if tool == .pencil, case let .pencil(existing)? = document.draft?.shape {
             var points = existing
             // Se descartan micro‑movimientos para que el trazo sea ligero y suave.
             if let last = points.last, hypot(point.x - last.x, point.y - last.y) < 1.2 { return }
@@ -171,6 +280,14 @@ final class CanvasView: NSView {
     }
 
     override func mouseUp(with event: NSEvent) {
+        if isPanning {
+            isPanning = false
+            panAnchor = nil
+            discardCursorRects()
+            window?.invalidateCursorRects(for: self)
+            return
+        }
+
         defer {
             isDrawing = false
             gestureAnchor = nil
@@ -185,7 +302,7 @@ final class CanvasView: NSView {
         let rect = CGRect(x: min(from.x, to.x), y: min(from.y, to.y),
                           width: abs(to.x - from.x), height: abs(to.y - from.y))
         let shape: AnnotationShape
-        switch document.tool {
+        switch document.tool.annotationTool ?? .arrow {
         case .arrow: shape = .arrow(from: from, to: to)
         case .rectangle: shape = .rectangle(rect)
         case .ellipse: shape = .ellipse(rect)
@@ -195,6 +312,33 @@ final class CanvasView: NSView {
         case .counter: shape = .counter(center: from, number: document.nextCounterNumber)
         }
         return Annotation(id: document.draft?.id ?? UUID(), shape: shape, style: document.currentStyle)
+    }
+
+    // MARK: - Rueda y gestos de zoom
+
+    /// La rueda del ratón hace zoom, acercando o alejando alrededor del cursor.
+    ///
+    /// Con el trackpad se distingue: dos dedos desplazan la captura (que es el gesto que se
+    /// espera en macOS) y el pellizco hace zoom.
+    override func scrollWheel(with event: NSEvent) {
+        let anchor = convert(event.locationInWindow, from: nil)
+
+        if event.hasPreciseScrollingDeltas {
+            panOffset.x += event.scrollingDeltaX
+            panOffset.y += event.scrollingDeltaY
+            clampPan()
+            needsDisplay = true
+            return
+        }
+
+        guard event.scrollingDeltaY != 0 else { return }
+        let step: CGFloat = event.scrollingDeltaY > 0 ? 1.12 : 1 / 1.12
+        setZoom(document.zoomFactor * step, anchorInView: anchor)
+    }
+
+    override func magnify(with event: NSEvent) {
+        let anchor = convert(event.locationInWindow, from: nil)
+        setZoom(document.zoomFactor * (1 + event.magnification), anchorInView: anchor)
     }
 
     /// Con la tecla Mayúsculas: cuadrados, círculos y flechas en ángulos de 45°.
@@ -224,6 +368,8 @@ final class CanvasView: NSView {
 
         let style = document.currentStyle
         let scale = displayScale
+        // El campo de edición usa la misma escala que el lienzo, de modo que el texto que se
+        // escribe tiene el tamaño exacto con el que se va a dibujar.
         let font = NSFont.systemFont(ofSize: style.fontSize * scale, weight: .semibold)
         let lineHeight = ceil(font.ascender - font.descender + font.leading)
 

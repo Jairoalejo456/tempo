@@ -87,6 +87,20 @@ enum ImageExporter {
         return "Captura \(formatter.string(from: date)).png"
     }
 
+    /// Devuelve una ruta libre dentro de `folder`, añadiendo un sufijo si el nombre ya existe.
+    /// Se usa al guardar sin preguntar, para no sobrescribir nunca una captura anterior.
+    static func availableURL(for fileName: String, in folder: URL) -> URL {
+        var url = folder.appendingPathComponent(fileName)
+        let stem = (fileName as NSString).deletingPathExtension
+        let ext = (fileName as NSString).pathExtension
+        var attempt = 2
+        while FileManager.default.fileExists(atPath: url.path) {
+            url = folder.appendingPathComponent("\(stem) (\(attempt)).\(ext)")
+            attempt += 1
+        }
+        return url
+    }
+
     /// Escribe la imagen en `url`. Devuelve el error si falla, sin lanzar diálogos.
     static func write(image: CGImage, to url: URL) throws {
         let data = try pngData(from: image)

@@ -52,6 +52,18 @@ O simplemente abre `Tempo.xcodeproj` en Xcode y pulsa ⌘R.
 Para dejarla instalada de forma permanente, copia el `.app` a `/Applications` y añádela a
 **Ajustes del Sistema › General › Ítems de inicio** si quieres que arranque con el Mac.
 
+### Icono
+
+El icono se dibuja vectorialmente a partir del símbolo de la marca, en todos los tamaños, para
+que se vea nítido igual en el Dock que a 16 px en la barra de menús:
+
+```bash
+swift Tools/generate-icon.swift light Tempo/Resources/Assets.xcassets/AppIcon.appiconset
+```
+
+Cambia `light` por `dark` para la variante sobre azul marino. Si prefieres partir de un PNG
+propio de 1024×1024, usa `Tools/make-appicon.sh logo-1024.png`.
+
 ### Firma
 
 El proyecto está configurado con `DEVELOPMENT_TEAM = TU_TEAM_ID` y firma manual. Si compilas
@@ -88,10 +100,13 @@ Puedes comprobar el estado desde el menú de la barra superior, o ejecutando:
 
 ### Globales (funcionan con cualquier aplicación en primer plano)
 
-| Acción | Atajo |
+| Acción | Atajo por omisión |
 |---|---|
 | Capturar la pantalla completa | `⌥⇧⌘F` |
 | Seleccionar y capturar una región | `⌥⇧⌘S` |
+
+Ambos se pueden cambiar en **Ajustes › Atajos** (⌘,): haz clic en el atajo y pulsa la
+combinación que quieras. Esc cancela y `⌫` restablece el original.
 
 Durante la selección de región: arrastra para definir la zona (se muestra el tamaño en píxeles),
 `Esc` o clic derecho para cancelar. Un clic sin arrastre también cancela.
@@ -100,6 +115,7 @@ Durante la selección de región: arrastra para definir la zona (se muestra el t
 
 | Herramienta | Tecla |
 |---|---|
+| Puntero (mover y hacer zoom) | `V` |
 | Flecha | `A` |
 | Rectángulo | `R` |
 | Elipse / círculo | `O` |
@@ -110,6 +126,9 @@ Durante la selección de región: arrastra para definir la zona (se muestra el t
 
 | Acción | Atajo |
 |---|---|
+| Acercar / Alejar | `⌘+` / `⌘−` |
+| Ajustar a la ventana | `⌘0` |
+| Tamaño real | `⌘1` |
 | Deshacer / Rehacer | `⌘Z` / `⇧⌘Z` |
 | Borrar la última anotación | `⌫` |
 | Elegir color | `1` … `8` |
@@ -125,6 +144,29 @@ su botón, y el botón **?** de la barra abre la lista completa.
 Con `⇧` mantenido al dibujar: cuadrados y círculos perfectos, y flechas en ángulos de 45°.
 
 ---
+
+## El puntero
+
+El editor abre siempre en modo **puntero** (`V`): mirar una captura y moverse por ella no debe
+ensuciarla con una anotación accidental al primer clic. Con el puntero activo:
+
+- **Arrastrar** desplaza la captura.
+- **La rueda del ratón** acerca y aleja alrededor del cursor. Con trackpad, dos dedos desplazan
+  y el pellizco hace zoom.
+- **Doble clic** vuelve a ajustar la captura a la ventana.
+
+El porcentaje de zoom se muestra en la barra; pulsarlo también reajusta.
+
+## Ajustes
+
+Se abren con `⌘,` o desde el menú de la barra superior.
+
+- **General** — qué ocurre al pulsar Guardar (preguntar siempre, o guardar directo sin diálogo)
+  y en qué carpeta. Guardando directo, la captura se escribe al instante con un nombre con
+  fecha y hora, y nunca se sobrescribe una anterior. Cuando se pregunta, el panel se abre en
+  esa carpeta y recuerda la última que uses.
+- **Atajos** — los dos atajos globales, editables, más la lista de atajos del editor.
+- **Acerca de** — versión y compilación, y acceso directo a los ajustes de privacidad de macOS.
 
 ## Herramientas del editor
 
@@ -150,7 +192,8 @@ Tempo/
 ├── Models/       Anotaciones, colores, imagen capturada y estado del editor (undo/redo)
 ├── Editor/       Ventana del editor, lienzo, barra de herramientas y renderizador
 ├── Thumbnail/    Panel flotante y arrastre a otras aplicaciones
-├── Services/     Atajos globales, exportación (portapapeles/disco) y avisos
+├── Preferences/  Ventana de ajustes y grabador de atajos
+├── Services/     Atajos globales, ajustes, exportación (portapapeles/disco) y avisos
 └── Resources/    Catálogo de recursos e icono de la app
 TempoTests/     Pruebas del núcleo (42 pruebas)
 Tools/            Utilidades de desarrollo
@@ -172,6 +215,9 @@ Tools/            Utilidades de desarrollo
   aplicación del filtro para que la miniatura y la capa de selección no salgan en la imagen.
 - **Sin sandbox**, para que el panel de guardar y el arrastre funcionen sin restricciones en
   un uso personal.
+- **Los atajos guardan el código físico de la tecla**, no el carácter, así que siguen
+  funcionando aunque se cambie la distribución del teclado; para mostrarlos se traducen con la
+  distribución activa, de modo que un teclado español enseña la tecla correcta.
 
 ---
 
@@ -195,6 +241,12 @@ Comprueba el permiso, hace una captura completa y una de región, aplica las sie
 verifica la numeración de contadores y el historial, compone a resolución nativa, copia al
 portapapeles y escribe un PNG en disco.
 
+Para probar el editor completo sin conceder ningún permiso, con una captura de ejemplo:
+
+```bash
+open -a /ruta/a/Tempo.app --args --demo
+```
+
 Y para revisar de un vistazo cómo se dibuja cada herramienta, sin necesidad de capturar nada:
 
 ```bash
@@ -213,8 +265,6 @@ captura y al arrancar la aplicación.
 ## Limitaciones conocidas
 
 - No hay selección ni edición de anotaciones ya creadas: se corrigen con `⌘Z` o `⌫`.
-- No hay zoom ni desplazamiento en el editor; la captura se ajusta a la ventana.
 - No hay captura de ventana concreta ni con retardo, ni captura con scroll.
-- Los atajos globales son fijos (no configurables desde la interfaz); se definen en
-  `Tempo/Services/HotKeyManager.swift`.
+- Los atajos del editor son fijos; sólo los dos globales son configurables.
 - La app no está notarizada: es para uso personal en este Mac.

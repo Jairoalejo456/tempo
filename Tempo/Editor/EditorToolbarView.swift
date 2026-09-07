@@ -9,6 +9,9 @@ struct EditorToolbarView: View {
     var onRedo: () -> Void
     var onCopy: () -> Void
     var onSave: () -> Void
+    var onZoomIn: () -> Void
+    var onZoomOut: () -> Void
+    var onZoomToFit: () -> Void
 
     @State private var showsShortcuts = false
 
@@ -21,6 +24,8 @@ struct EditorToolbarView: View {
             widthGroup
             divider
             historyGroup
+            divider
+            zoomGroup
 
             Spacer(minLength: 12)
 
@@ -41,17 +46,57 @@ struct EditorToolbarView: View {
 
     private var toolGroup: some View {
         HStack(spacing: 2) {
-            ForEach(AnnotationTool.allCases) { tool in
+            ForEach(EditorTool.allCases) { tool in
                 ToolButton(
                     symbol: tool.symbolName,
                     shortcut: tool.shortcutKey.uppercased(),
                     isSelected: document.tool == tool,
-                    help: "\(tool.title) · \(tool.shortcutKey.uppercased())"
+                    help: helpText(for: tool)
                 ) {
                     document.tool = tool
                 }
+                // El puntero se separa del resto: no dibuja, navega.
+                if tool == .navigate {
+                    divider.padding(.horizontal, 3)
+                }
             }
         }
+    }
+
+    private func helpText(for tool: EditorTool) -> String {
+        let key = tool.shortcutKey.uppercased()
+        switch tool {
+        case .navigate:
+            return "Puntero · \(key) — arrastra para mover, rueda para acercar o alejar"
+        case .annotate:
+            return "\(tool.title) · \(key)"
+        }
+    }
+
+    /// Control de zoom: porcentaje actual y botones para acercar, alejar y ajustar.
+    private var zoomGroup: some View {
+        HStack(spacing: 2) {
+            ToolButton(symbol: "minus.magnifyingglass", shortcut: nil, isSelected: false,
+                       help: "Alejar · ⌘−", action: onZoomOut)
+
+            Button(action: onZoomToFit) {
+                Text(zoomLabel)
+                    .font(.system(size: 10, weight: .medium, design: .rounded))
+                    .monospacedDigit()
+                    .frame(width: 42, height: 30)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help("Ajustar a la ventana · ⌘0")
+
+            ToolButton(symbol: "plus.magnifyingglass", shortcut: nil, isSelected: false,
+                       help: "Acercar · ⌘+", action: onZoomIn)
+        }
+    }
+
+    private var zoomLabel: String {
+        let percentage = Int((document.effectiveZoom * 100).rounded())
+        return "\(max(percentage, 1)) %"
     }
 
     private var colorGroup: some View {
@@ -231,17 +276,22 @@ enum LineWeight: String, CaseIterable, Identifiable {
 
 /// Lista completa de atajos, accesible desde el botón "?" de la barra.
 struct ShortcutsCheatSheet: View {
-    private let tools = AnnotationTool.allCases
-
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            section("Herramientas", rows: tools.map { ($0.title, $0.shortcutKey.uppercased()) })
+            section("Herramientas", rows: EditorTool.allCases.map { ($0.title, $0.shortcutKey.uppercased()) })
             section("Edición", rows: [
                 ("Deshacer", "⌘Z"),
                 ("Rehacer", "⇧⌘Z"),
                 ("Borrar la última anotación", "⌫"),
                 ("Colores", "1 – 8"),
                 ("Grosor", "[  /  ]")
+            ])
+            section("Vista", rows: [
+                ("Acercar / Alejar", "⌘+  /  ⌘−"),
+                ("Ajustar a la ventana", "⌘0"),
+                ("Tamaño real", "⌘1"),
+                ("Con el puntero: mover", "arrastrar"),
+                ("Con el puntero: zoom", "rueda")
             ])
             section("Salida", rows: [
                 ("Copiar con anotaciones", "⌘C"),
@@ -250,8 +300,8 @@ struct ShortcutsCheatSheet: View {
                 ("Descartar la captura", "⇧⌘⌫")
             ])
             section("Captura global", rows: [
-                ("Pantalla completa", HotKeyManager.fullScreenShortcut.display),
-                ("Región", HotKeyManager.regionShortcut.display)
+                ("Pantalla completa", Preferences.shared.fullScreenShortcut.display),
+                ("Región", Preferences.shared.regionShortcut.display)
             ])
         }
         .padding(16)

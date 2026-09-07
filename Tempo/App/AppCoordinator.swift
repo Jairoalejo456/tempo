@@ -58,6 +58,13 @@ final class AppCoordinator: NSObject {
         }
     }
 
+    /// Abre una captura de ejemplo para poder probar el editor sin necesidad del permiso de
+    /// grabación de pantalla. Se activa con `--demo`.
+    @MainActor
+    func presentDemoCapture() {
+        present(capture: SampleRenderer.makeSyntheticCapture(), on: NSScreen.main)
+    }
+
     // MARK: - Presentación
 
     @MainActor
@@ -183,11 +190,32 @@ final class AppCoordinator: NSObject {
             return
         }
 
+        let preferences = Preferences.shared
+        let fileName = ImageExporter.suggestedFileName(for: session.document.capture.createdAt)
+
+        // Guardado directo: sin panel, a la carpeta configurada en los ajustes.
+        if preferences.saveMode == .direct, preferences.saveFolderExists {
+            do {
+                let url = ImageExporter.availableURL(for: fileName, in: preferences.saveFolder)
+                try ImageExporter.write(image: image, to: url)
+                HUDPresenter.show("Guardado en \(preferences.saveFolder.lastPathComponent)",
+                                  symbol: "checkmark.circle.fill", on: session.screen)
+                close(session)
+            } catch {
+                report(error)
+            }
+            return
+        }
+
         let panel = NSSavePanel()
         panel.allowedContentTypes = [.png]
         panel.canCreateDirectories = true
-        panel.nameFieldStringValue = ImageExporter.suggestedFileName(for: session.document.capture.createdAt)
+        panel.nameFieldStringValue = fileName
         panel.message = "Elige dónde guardar la captura"
+        // El panel se abre en la carpeta configurada, aunque se pregunte cada vez.
+        if preferences.saveFolderExists {
+            panel.directoryURL = preferences.saveFolder
+        }
 
         NSApp.activate(ignoringOtherApps: true)
 
@@ -197,6 +225,8 @@ final class AppCoordinator: NSObject {
             guard response == .OK, let url = panel.url else { return }
             do {
                 try ImageExporter.write(image: image, to: url)
+                // La carpeta elegida pasa a ser la propuesta la próxima vez.
+                Preferences.shared.saveFolder = url.deletingLastPathComponent()
                 HUDPresenter.show("Guardado", symbol: "checkmark.circle.fill", on: session.screen)
                 self.close(session)
             } catch {
