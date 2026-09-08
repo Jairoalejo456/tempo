@@ -4,11 +4,33 @@ Utilidad de captura de pantalla para macOS pensada para un flujo concreto: **cap
 rápido y arrastrar la imagen a un chat de IA** (ChatGPT, Claude, o cualquier otra aplicación
 que acepte imágenes) sin pasos intermedios.
 
-No integra ninguna API de inteligencia artificial. La conexión con el LLM ocurre donde ya
+No integra ninguna API de inteligencia artificial. La conexión con el modelo ocurre donde ya
 estás trabajando: arrastrando la miniatura, o pegando con ⌘V.
 
-> Estado: MVP funcional para uso personal. Sin distribución, sin actualizaciones automáticas,
-> sin cuentas y sin telemetría.
+Nativa (Swift, AppKit y SwiftUI), sin dependencias externas, sin cuentas, sin nube y sin
+telemetría. Todo se queda en tu Mac.
+
+[![macOS 14+](https://img.shields.io/badge/macOS-14%2B-black)](https://www.apple.com/macos/)
+[![Swift](https://img.shields.io/badge/Swift-5-orange)](https://swift.org)
+[![Licencia MIT](https://img.shields.io/badge/licencia-MIT-blue)](LICENSE)
+
+---
+
+## Instalación rápida
+
+```bash
+git clone https://github.com/Jairoalejo456/tempo.git
+cd tempo
+xcodebuild -project Tempo.xcodeproj -scheme Tempo -configuration Release build
+cp -R ~/Library/Developer/Xcode/DerivedData/Tempo-*/Build/Products/Release/Tempo.app /Applications/
+open /Applications/Tempo.app
+```
+
+No hace falta cuenta de desarrollador: el proyecto se firma de forma ad-hoc por omisión. La
+primera vez, macOS pedirá el permiso de **Grabación de pantalla**; concédelo y vuelve a abrir la
+aplicación.
+
+Tempo vive en la barra de menús. Pulsa `⌥⇧⌘S` para capturar una región y empezar.
 
 ---
 
@@ -35,21 +57,14 @@ se retira antes de tiempo, sigue estando en **Capturas recientes**, en el menú 
 
 ## Requisitos
 
-- macOS 14 o posterior (el proyecto está probado en macOS 26.6, Apple Silicon).
-- Xcode 16 o posterior (probado con Xcode 26.6).
-- Una identidad de firma de desarrollo en el llavero (el proyecto usa firma manual con
-  `Apple Development`).
+- **macOS 14 o posterior.** Desarrollado y probado en macOS 26.6, Apple Silicon.
+- **Xcode 16 o posterior** (probado con Xcode 26.6).
+- Ninguna dependencia externa ni gestor de paquetes.
 
 ## Compilar y ejecutar
 
-```bash
-git clone <este-repositorio>
-cd Tempo
-xcodebuild -project Tempo.xcodeproj -scheme Tempo -configuration Release build
-open ~/Library/Developer/Xcode/DerivedData/Tempo-*/Build/Products/Release/Tempo.app
-```
-
-O simplemente abre `Tempo.xcodeproj` en Xcode y pulsa ⌘R.
+Abre `Tempo.xcodeproj` en Xcode y pulsa ⌘R, o compila desde la terminal como en la instalación
+rápida de arriba.
 
 Copia el `.app` a `/Applications` y añádela a **Ajustes del Sistema › General › Ítems de
 inicio** si quieres que arranque con el Mac. Instalarla ahí importa: macOS liga el permiso de
@@ -391,6 +406,23 @@ Y para revisar de un vistazo cómo se dibuja cada herramienta, sin necesidad de 
 ```
 
 ---
+
+## Contribuir
+
+Las contribuciones son bienvenidas. En [CONTRIBUTING.md](CONTRIBUTING.md) están las
+instrucciones para poner el proyecto en marcha, cómo está organizado el código, las dos ideas
+de diseño que conviene respetar al tocarlo, y una lista de cosas pendientes por si buscas por
+dónde empezar.
+
+Antes de abrir un pull request:
+
+```bash
+xcodebuild -project Tempo.xcodeproj -scheme Tempo test
+```
+
+## Licencia
+
+[MIT](LICENSE). Úsalo, cámbialo y compártelo como quieras.
 
 ## Privacidad
 

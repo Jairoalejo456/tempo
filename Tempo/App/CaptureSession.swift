@@ -16,8 +16,10 @@ final class CaptureSession {
 
     /// Archivo temporal creado para arrastrar; se borra al cerrar la sesión.
     var dragFileURL: URL?
-    /// Anotaciones con las que se generó `dragFileURL`, para no reescribirlo si nada cambió.
-    var dragFileAnnotations: [Annotation]?
+    /// Estado del documento con el que se generó `dragFileURL`, para no reescribirlo si nada ha
+    /// cambiado. Incluye la captura, no sólo las anotaciones: recortar cambia la imagen aunque
+    /// no haya ninguna anotación, y el archivo tendría que rehacerse igualmente.
+    var dragFileState: DocumentSnapshot?
 
     init(capture: CaptureImage, screen: NSScreen?) {
         self.document = EditorDocument(capture: capture)

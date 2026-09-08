@@ -5,16 +5,26 @@ import XCTest
 /// Historial local de capturas: se guarda en este Mac y caduca solo.
 final class ArchiveTests: XCTestCase {
 
-    private var archive: CaptureArchive { CaptureArchive.shared }
+    /// Historial aislado: las pruebas no pueden tocar el del usuario, que se estaría borrando
+    /// cada vez que se ejecutan.
+    private var archive: CaptureArchive!
+    private var folder: URL!
+    private var suiteName: String!
 
-    override func setUp() {
-        super.setUp()
-        archive.removeAll()
+    override func setUpWithError() throws {
+        try super.setUpWithError()
+        folder = FileManager.default.temporaryDirectory
+            .appendingPathComponent("tempo-archive-tests-\(UUID().uuidString)")
+        suiteName = "com.jairo.tempo.tests.archive.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        archive = CaptureArchive(folder: folder, preferences: Preferences(defaults: defaults))
     }
 
-    override func tearDown() {
-        archive.removeAll()
-        super.tearDown()
+    override func tearDownWithError() throws {
+        archive = nil
+        try? FileManager.default.removeItem(at: folder)
+        UserDefaults.standard.removePersistentDomain(forName: suiteName)
+        try super.tearDownWithError()
     }
 
     private func store(id: UUID = UUID(), daysAgo: Int = 0) throws -> UUID {
@@ -62,7 +72,7 @@ final class ArchiveTests: XCTestCase {
     // MARK: - Caducidad
 
     func testOldCapturesAreRemoved() throws {
-        Preferences.shared.historyDays = 7
+        archive.preferences.historyDays = 7
         _ = try store(daysAgo: 30)
         _ = try store(daysAgo: 1)
 
@@ -91,8 +101,7 @@ final class ArchiveTests: XCTestCase {
     // MARK: - Se puede desactivar
 
     func testNothingIsStoredWhenHistoryIsOff() throws {
-        Preferences.shared.keepsHistory = false
-        defer { Preferences.shared.keepsHistory = true }
+        archive.preferences.keepsHistory = false
 
         let capture = TestSupport.makeCapture(logicalWidth: 40, logicalHeight: 30, scale: 1)
         let image = try ImageExporter.compose(capture: capture, annotations: [])
@@ -105,8 +114,9 @@ final class ArchiveTests: XCTestCase {
 
     // MARK: - Dónde vive
 
-    func testArchiveLivesInApplicationSupport() {
-        let path = archive.folder.path
+    func testRealArchiveLivesInApplicationSupport() {
+        // El historial de verdad —no el aislado de estas pruebas— vive dentro del usuario.
+        let path = CaptureArchive.shared.folder.path
         XCTAssertTrue(path.contains("Application Support"), "Obtenido: \(path)")
         XCTAssertTrue(path.contains("Tempo"))
     }

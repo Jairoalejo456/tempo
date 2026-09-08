@@ -183,7 +183,44 @@ enum SelfCheck {
             report(false, "Guardar en disco: \(error.localizedDescription)")
         }
 
-        // 8. Archivo temporal para arrastrar.
+        // 8. Recorte del encuadre.
+        let sizeBeforeCrop = document.capture.logicalSize
+        let cropRect = CGRect(x: sizeBeforeCrop.width * 0.1, y: sizeBeforeCrop.height * 0.1,
+                              width: sizeBeforeCrop.width * 0.6, height: sizeBeforeCrop.height * 0.6)
+        let annotationsBeforeCrop = document.annotations.count
+        let cropped = document.crop(to: cropRect)
+        report(cropped && document.capture.logicalSize != sizeBeforeCrop,
+               "Recorte aplicado: \(Int(sizeBeforeCrop.width))×\(Int(sizeBeforeCrop.height)) pt "
+               + "⇒ \(Int(document.capture.logicalSize.width))×\(Int(document.capture.logicalSize.height)) pt")
+        document.undo()
+        report(document.capture.logicalSize == sizeBeforeCrop
+               && document.annotations.count == annotationsBeforeCrop,
+               "Deshacer el recorte devuelve la captura y sus anotaciones")
+
+        // 9. Reducción al copiar.
+        let reduced = ImageExporter.resized(composed, maximumSide: 1600)
+        report(max(reduced.width, reduced.height) <= 1600,
+               "Reducción para el portapapeles: \(composed.width)×\(composed.height) ⇒ \(reduced.width)×\(reduced.height) px")
+
+        // 10. Historial local.
+        let archiveID = UUID()
+        CaptureArchive.shared.store(image: composed, id: archiveID, date: Date())
+        var stored = false
+        let deadline = Date().addingTimeInterval(3)
+        while !stored, Date() < deadline {
+            stored = CaptureArchive.shared.entries().contains { $0.id == archiveID }
+            if !stored { Thread.sleep(forTimeInterval: 0.05) }
+        }
+        if Preferences.shared.keepsHistory {
+            report(stored, "Historial local: la captura queda guardada y se puede recuperar")
+            if let entry = CaptureArchive.shared.entries().first(where: { $0.id == archiveID }) {
+                try? FileManager.default.removeItem(at: entry.url)
+            }
+        } else {
+            report(!stored, "Historial local desactivado: no se escribe nada en disco")
+        }
+
+        // 11. Archivo temporal para arrastrar.
         do {
             let dragURL = try ImageExporter.writeTemporaryFile(image: composed, date: Date())
             report(FileManager.default.fileExists(atPath: dragURL.path),

@@ -99,10 +99,20 @@ final class ThumbnailWindowController: NSWindowController {
         }
     }
 
-    /// Refresca la imagen mostrada (por ejemplo tras anotar en el editor).
+    /// Refresca la imagen mostrada, por ejemplo tras anotar o recortar en el editor.
+    ///
+    /// El panel se redimensiona si la captura ha cambiado de proporción: recortar puede pasar
+    /// de apaisado a cuadrado, y mantener el tamaño anterior deformaría la miniatura.
     func update(image: NSImage) {
         thumbnailView.image = image
         thumbnailView.needsDisplay = true
+
+        let fitted = ThumbnailWindowController.fittedSize(for: image.size)
+        guard let window, window.frame.size != fitted else { return }
+        // Se ancla la esquina inferior derecha, que es por donde se apilan las miniaturas.
+        let origin = NSPoint(x: window.frame.maxX - fitted.width, y: window.frame.minY)
+        window.setFrame(NSRect(origin: origin, size: fitted), display: true)
+        thumbnailView.frame = NSRect(origin: .zero, size: fitted)
     }
 
     // MARK: - Puente con la vista

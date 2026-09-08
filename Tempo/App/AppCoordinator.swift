@@ -99,12 +99,13 @@ final class AppCoordinator: NSObject {
             DispatchQueue.main.async {
                 // Si entretanto se anotó o se cerró la captura, el archivo ya no sirve.
                 guard session.dragFileURL == nil, session.document.annotations.isEmpty,
+                      session.document.capture === capture,
                       self.sessions.contains(where: { $0.id == session.id }) else {
                     try? FileManager.default.removeItem(at: url)
                     return
                 }
                 session.dragFileURL = url
-                session.dragFileAnnotations = []
+                session.dragFileState = session.document.snapshot
             }
         }
     }
@@ -378,9 +379,10 @@ extension AppCoordinator: ThumbnailWindowDelegate {
     func thumbnailFileURLForDragging(_ controller: ThumbnailWindowController) -> URL? {
         guard let session = session(with: controller.sessionID) else { return nil }
 
-        // Se reutiliza el archivo si las anotaciones no han cambiado desde el último arrastre.
+        // Se reutiliza el archivo sólo si el documento entero sigue igual: las anotaciones y la
+        // propia captura, que cambia al recortar.
         if let url = session.dragFileURL,
-           session.dragFileAnnotations == session.document.annotations,
+           session.dragFileState == session.document.snapshot,
            FileManager.default.fileExists(atPath: url.path) {
             return url
         }
@@ -391,7 +393,7 @@ extension AppCoordinator: ThumbnailWindowDelegate {
             let image = try ImageExporter.compose(document: session.document)
             let url = try ImageExporter.writeTemporaryFile(image: image, date: session.document.capture.createdAt)
             session.dragFileURL = url
-            session.dragFileAnnotations = session.document.annotations
+            session.dragFileState = session.document.snapshot
             return url
         } catch {
             NSLog("[Tempo] No se pudo preparar el archivo para arrastrar: \(error.localizedDescription)")

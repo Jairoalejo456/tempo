@@ -10,6 +10,12 @@ final class CaptureArchive {
 
     static let shared = CaptureArchive()
 
+    /// Carpeta alternativa y ajustes propios. Permiten que las pruebas trabajen sobre un
+    /// historial aislado en lugar de sobre el del usuario, que se estaría borrando cada vez
+    /// que se ejecutan.
+    private let rootOverride: URL?
+    let preferences: Preferences
+
     /// Una captura guardada.
     struct Entry: Identifiable, Equatable {
         let id: UUID
@@ -30,13 +36,21 @@ final class CaptureArchive {
     private let fileManager = FileManager.default
     private let queue = DispatchQueue(label: "com.jairo.tempo.archive", qos: .utility)
 
-    private init() {}
+    init(folder: URL? = nil, preferences: Preferences = .shared) {
+        self.rootOverride = folder
+        self.preferences = preferences
+    }
 
     /// Carpeta del historial, dentro del soporte de la aplicación.
     var folder: URL {
-        let base = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
-            ?? fileManager.temporaryDirectory
-        let url = base.appendingPathComponent("Tempo/Historial", isDirectory: true)
+        let url: URL
+        if let rootOverride {
+            url = rootOverride
+        } else {
+            let base = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+                ?? fileManager.temporaryDirectory
+            url = base.appendingPathComponent("Tempo/Historial", isDirectory: true)
+        }
         try? fileManager.createDirectory(at: url, withIntermediateDirectories: true)
         return url
     }
@@ -46,7 +60,7 @@ final class CaptureArchive {
     /// Archiva una captura. Si ya había una guardada con ese identificador, la reemplaza, de
     /// modo que al cerrar una sesión anotada se conserva la versión con sus anotaciones.
     func store(image: CGImage, id: UUID, date: Date) {
-        guard Preferences.shared.keepsHistory else { return }
+        guard preferences.keepsHistory else { return }
         let folder = self.folder
         queue.async { [weak self] in
             guard let self else { return }
@@ -92,7 +106,7 @@ final class CaptureArchive {
 
     /// Borra lo que haya caducado y lo que sobre del límite de entradas.
     func pruneOldEntries() {
-        let days = Preferences.shared.historyDays
+        let days = preferences.historyDays
         let deadline = Calendar.current.date(byAdding: .day, value: -days, to: Date()) ?? .distantPast
         var kept: [Entry] = []
 
@@ -115,8 +129,8 @@ final class CaptureArchive {
     /// Espacio que ocupa el historial, en bytes.
     func totalSize() -> Int {
         entries().reduce(0) { total, entry in
-            let size = (try? fileManager.attributesOfItem(atPath: entry.url.path)[.size] as? Int) ?? 0
-            return total + (size ?? 0)
+            let attributes = try? fileManager.attributesOfItem(atPath: entry.url.path)
+            return total + (attributes?[.size] as? Int ?? 0)
         }
     }
 

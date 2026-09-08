@@ -112,6 +112,14 @@ enum MainMenu {
         let menu = NSMenu(title: "Visualización")
 
         menu.addItem(withTitle: "Acercar", action: #selector(EditorWindowController.zoomIn(_:)), keyEquivalent: "+")
+        // Duplicado con "=", que es donde está el "+" sin Mayúsculas en muchos teclados. El
+        // ítem se oculta del menú, pero su atajo sigue funcionando.
+        let zoomInAlternate = menu.addItem(withTitle: "Acercar",
+                                           action: #selector(EditorWindowController.zoomIn(_:)),
+                                           keyEquivalent: "=")
+        zoomInAlternate.isHidden = true
+        zoomInAlternate.isAlternate = false
+
         menu.addItem(withTitle: "Alejar", action: #selector(EditorWindowController.zoomOut(_:)), keyEquivalent: "-")
         menu.addItem(.separator())
         menu.addItem(withTitle: "Ajustar a la ventana", action: #selector(EditorWindowController.zoomToFit(_:)), keyEquivalent: "0")

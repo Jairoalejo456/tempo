@@ -56,7 +56,9 @@ final class EditorDocument: ObservableObject {
     @Published private var undoStack: [DocumentSnapshot] = []
     @Published private var redoStack: [DocumentSnapshot] = []
 
-    private var snapshot: DocumentSnapshot {
+    /// Estado actual completo. Lo usan el historial y quien necesite saber si el documento ha
+    /// cambiado, incluida la propia captura.
+    var snapshot: DocumentSnapshot {
         DocumentSnapshot(capture: capture, annotations: annotations)
     }
 
