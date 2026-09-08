@@ -150,7 +150,7 @@ arrastre también.
 | Deshacer / Rehacer | `⌘Z` / `⇧⌘Z` |
 | Borrar la última anotación | `⌫` |
 | Elegir color | `1` … `8` (salvo con un contador seleccionado) |
-| Grosor y tamaño de texto | `[` / `]` |
+| Ajuste de la herramienta activa | `[` / `]` |
 | Copiar con anotaciones | `⌘C` |
 | Guardar como PNG | `⌘S` |
 | Volver a la miniatura | `⌘W` o `Esc` |
@@ -225,12 +225,18 @@ la numeración automática continúa desde el mayor que exista.
 Un arrastre completo —mover, redimensionar o girar— cuenta como **una sola** operación de
 deshacer, no una por cada movimiento del ratón.
 
+El deslizador sustituye a los tres tamaños fijos cuando la herramienta activa —o la anotación
+seleccionada— es un blur o un trazo a lápiz, así que la barra no crece por tenerlo.
+
 ## Herramientas del editor
 
-- **Flecha**, **rectángulo**, **elipse** y **lápiz** con color y grosor configurables.
+- **Flecha**, **rectángulo** y **elipse** con color y tres tamaños.
+- **Lápiz** con color y un **deslizador de grosor** continuo, de 1 a 24 puntos.
 - **Texto**: se escribe en el sitio, con el color y el tamaño activos. `↩` confirma, `⌥↩`
   añade una línea, `Esc` cancela.
-- **Blur**: difumina la región seleccionada para censurar datos sensibles.
+- **Blur**: difumina la región seleccionada para censurar datos sensibles. Su **intensidad** se
+  ajusta con el deslizador de la barra, que aparece al elegir la herramienta o al seleccionar
+  un blur ya puesto.
 - **Contadores**: círculos numerados que se autoincrementan (1, 2, 3…). Al deshacer, la
   numeración vuelve atrás sola.
 

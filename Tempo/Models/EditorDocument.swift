@@ -16,6 +16,8 @@ final class EditorDocument: ObservableObject {
     @Published var color: AnnotationColor = .red
     @Published var lineWidth: CGFloat = 4
     @Published var fontSize: CGFloat = 28
+    /// Fuerza del difuminado que se aplicará a los siguientes blurs.
+    @Published var blurIntensity: CGFloat = AnnotationStyle.defaultBlurIntensity
 
     /// Anotación que se está creando con el ratón; se dibuja pero aún no forma parte del historial.
     @Published var draft: Annotation?
@@ -43,8 +45,11 @@ final class EditorDocument: ObservableObject {
     }
 
     var currentStyle: AnnotationStyle {
-        AnnotationStyle(color: color, lineWidth: lineWidth, fontSize: fontSize)
+        AnnotationStyle(color: color, lineWidth: lineWidth, fontSize: fontSize, blurIntensity: blurIntensity)
     }
+
+    /// Rango de grosor del lápiz, que se ajusta con su deslizador.
+    static let pencilWidthRange: ClosedRange<CGFloat> = 1...24
 
     /// Lo que debe dibujarse ahora mismo: historial + borrador en curso.
     var renderableAnnotations: [Annotation] {
@@ -170,6 +175,20 @@ final class EditorDocument: ObservableObject {
         if annotation.tool == .text || annotation.tool == .counter {
             annotation.style.fontSize = fontSize
         }
+        replace(annotation)
+    }
+
+    /// Aplica la intensidad de difuminado activa al blur seleccionado, si lo hay.
+    func applyBlurIntensityToSelection() {
+        guard var annotation = selectedAnnotation, annotation.tool == .blur else { return }
+        annotation.style.blurIntensity = blurIntensity
+        replace(annotation)
+    }
+
+    /// Aplica el grosor activo al trazo seleccionado, si lo hay.
+    func applyLineWidthToSelection() {
+        guard var annotation = selectedAnnotation, annotation.tool == .pencil else { return }
+        annotation.style.lineWidth = lineWidth
         replace(annotation)
     }
 

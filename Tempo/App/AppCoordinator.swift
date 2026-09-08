@@ -66,10 +66,6 @@ final class AppCoordinator: NSObject {
         guard let session = sessions.last else { return }
         if withSampleAnnotations {
             SampleRenderer.addSampleAnnotations(to: session.document)
-            // Se deja elegido un rectángulo, que es la forma con todos los tiradores.
-            if let rectangle = session.document.annotations.first(where: { $0.tool == .rectangle }) {
-                session.document.select(rectangle.id)
-            }
         }
         guard openingEditor else { return }
         openEditor(for: session)

@@ -61,7 +61,9 @@ struct EditorToolbarView: View {
             divider
             colorGroup
             divider
-            widthGroup
+            // El blur y el lápiz tienen su propio ajuste continuo; el resto usa los tres
+            // tamaños fijos, que van más rápido.
+            settingGroup
             divider
             historyGroup
 
@@ -175,6 +177,57 @@ struct EditorToolbarView: View {
         }
         .opacity(document.tool.usesColor ? 1 : 0.35)
         .disabled(!document.tool.usesColor)
+    }
+
+    /// Ajuste que corresponde a la herramienta activa.
+    @ViewBuilder
+    private var settingGroup: some View {
+        switch activeSetting {
+        case .blurIntensity:
+            SliderSetting(
+                title: "Intensidad",
+                systemImage: "drop.halffull",
+                value: Binding(
+                    get: { document.blurIntensity },
+                    set: {
+                        document.blurIntensity = $0
+                        document.applyBlurIntensityToSelection()
+                    }
+                ),
+                range: 0...1,
+                help: "Fuerza del difuminado"
+            )
+        case .pencilWidth:
+            SliderSetting(
+                title: "Grosor",
+                systemImage: "pencil.tip",
+                value: Binding(
+                    get: { document.lineWidth },
+                    set: {
+                        document.lineWidth = $0
+                        document.applyLineWidthToSelection()
+                    }
+                ),
+                range: EditorDocument.pencilWidthRange,
+                help: "Grosor del trazo"
+            )
+        case .fixedWeights:
+            widthGroup
+        }
+    }
+
+    private enum ActiveSetting {
+        case blurIntensity, pencilWidth, fixedWeights
+    }
+
+    /// La barra sigue a lo que estés tocando: primero lo seleccionado, y si no, la herramienta.
+    private var activeSetting: ActiveSetting {
+        let tool = document.selectedAnnotation.map { EditorTool.annotate($0.tool) } ?? document.tool
+        switch tool {
+        case .annotate(.blur): return .blurIntensity
+        case .annotate(.pencil): return .pencilWidth
+        default: return .fixedWeights
+        }
     }
 
     private var widthGroup: some View {
@@ -315,6 +368,40 @@ private struct ToolButton: View {
         }
         .buttonStyle(.plain)
         .help(help)
+    }
+}
+
+/// Deslizador compacto para un ajuste continuo (intensidad del blur, grosor del lápiz).
+private struct SliderSetting: View {
+    let title: String
+    let systemImage: String
+    @Binding var value: CGFloat
+    let range: ClosedRange<CGFloat>
+    let help: String
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: systemImage)
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+            Slider(value: $value, in: range)
+                .controlSize(.mini)
+                .frame(width: 88)
+            Text(readout)
+                .font(.system(size: 10, weight: .medium, design: .rounded))
+                .monospacedDigit()
+                .foregroundStyle(.secondary)
+                .frame(width: 26, alignment: .leading)
+        }
+        .frame(height: EditorMetrics.toolButtonHeight)
+        .help("\(help) · \(title)")
+    }
+
+    private var readout: String {
+        // La intensidad se lee en porcentaje; el grosor, en puntos.
+        range.upperBound <= 1
+            ? "\(Int((value * 100).rounded())) %"
+            : "\(Int(value.rounded())) pt"
     }
 }
 

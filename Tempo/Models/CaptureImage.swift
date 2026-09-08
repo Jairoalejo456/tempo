@@ -30,29 +30,48 @@ final class CaptureImage {
         CGRect(origin: .zero, size: logicalSize)
     }
 
-    /// Versión difuminada de la captura completa, calculada una sola vez y reutilizada por
-    /// todas las anotaciones de blur (cada una dibuja únicamente su recorte).
-    private var cachedBlur: CGImage?
+    /// Versiones difuminadas de la captura completa, una por nivel de intensidad.
+    ///
+    /// Cada anotación de blur dibuja únicamente su recorte de estas imágenes. Se guardan en
+    /// caché por nivel —no por valor exacto— para no rehacer el filtro mientras se arrastra el
+    /// deslizador de intensidad.
+    private var cachedBlurs: [Int: CGImage] = [:]
     private let blurLock = NSLock()
 
-    func blurredImage() -> CGImage? {
+    /// Número de niveles distintos de intensidad que se llegan a calcular.
+    static let blurLevels = 20
+
+    func blurredImage(intensity: CGFloat = AnnotationStyle.defaultBlurIntensity) -> CGImage? {
+        let level = CaptureImage.level(for: intensity)
         blurLock.lock()
         defer { blurLock.unlock() }
-        if let cachedBlur { return cachedBlur }
-        let produced = CaptureImage.makeBlurred(from: cgImage)
-        cachedBlur = produced
+        if let cached = cachedBlurs[level] { return cached }
+        let produced = CaptureImage.makeBlurred(from: cgImage, level: level)
+        cachedBlurs[level] = produced
         return produced
     }
 
-    private static func makeBlurred(from image: CGImage) -> CGImage? {
+    static func level(for intensity: CGFloat) -> Int {
+        let clamped = min(max(intensity, 0), 1)
+        return Int((clamped * CGFloat(blurLevels)).rounded())
+    }
+
+    /// Radio del difuminado para un nivel dado, en píxeles de la captura.
+    ///
+    /// Se escala con el tamaño de la imagen para que la censura sea igual de fuerte en una
+    /// captura pequeña que en una pantalla completa Retina.
+    static func blurRadius(level: Int, for image: CGImage) -> Double {
+        let intensity = Double(level) / Double(blurLevels)
+        let shortestSide = Double(min(image.width, image.height))
+        return max(4, shortestSide * (0.006 + 0.032 * intensity))
+    }
+
+    private static func makeBlurred(from image: CGImage, level: Int) -> CGImage? {
         let input = CIImage(cgImage: image)
-        // El radio se escala con el tamaño para que la censura sea igual de fuerte
-        // en una captura pequeña que en una pantalla completa Retina.
-        let radius = max(12.0, Double(min(image.width, image.height)) * 0.02)
         guard let filter = CIFilter(name: "CIGaussianBlur") else { return nil }
         // `clampedToExtent` evita que los bordes se vuelvan transparentes al difuminar.
         filter.setValue(input.clampedToExtent(), forKey: kCIInputImageKey)
-        filter.setValue(radius, forKey: kCIInputRadiusKey)
+        filter.setValue(blurRadius(level: level, for: image), forKey: kCIInputRadiusKey)
         guard let output = filter.outputImage else { return nil }
         let context = CIContext(options: [.useSoftwareRenderer: false])
         return context.createCGImage(output, from: input.extent)

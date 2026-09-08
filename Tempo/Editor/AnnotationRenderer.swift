@@ -50,6 +50,7 @@ enum AnnotationRenderer {
         switch annotation.shape {
         case let .blur(rect):
             drawBlur(rect: rect,
+                     intensity: annotation.style.blurIntensity,
                      undoingRotation: annotation.rotation == 0 ? nil : rotationTransform(for: annotation).inverted(),
                      capture: capture,
                      in: context)
@@ -101,10 +102,11 @@ enum AnnotationRenderer {
     // MARK: - Implementación por herramienta
 
     private static func drawBlur(rect: CGRect,
+                                 intensity: CGFloat,
                                  undoingRotation inverse: CGAffineTransform?,
                                  capture: CaptureImage,
                                  in context: CGContext) {
-        guard let blurred = capture.blurredImage() else { return }
+        guard let blurred = capture.blurredImage(intensity: intensity) else { return }
         context.saveGState()
         // El recorte sí gira con el rectángulo…
         context.clip(to: rect)

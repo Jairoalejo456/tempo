@@ -260,13 +260,29 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSMenu
         }
     }
 
+    /// `[` y `]` ajustan lo que corresponda a lo que se está tocando: la intensidad del blur,
+    /// el grosor del lápiz, o el tamaño del resto de herramientas.
     private func adjustWeight(by delta: Int) {
-        let weights = LineWeight.allCases
-        let current = weights.firstIndex { abs($0.lineWidth - editorDocument.lineWidth) < 0.01 } ?? 1
-        let next = min(max(current + delta, 0), weights.count - 1)
-        editorDocument.lineWidth = weights[next].lineWidth
-        editorDocument.fontSize = weights[next].fontSize
-        editorDocument.applyWeightToSelection()
+        let tool = editorDocument.selectedAnnotation.map { EditorTool.annotate($0.tool) } ?? editorDocument.tool
+
+        switch tool {
+        case .annotate(.blur):
+            let step: CGFloat = 1 / CGFloat(CaptureImage.blurLevels) * 2
+            editorDocument.blurIntensity = min(max(editorDocument.blurIntensity + CGFloat(delta) * step, 0), 1)
+            editorDocument.applyBlurIntensityToSelection()
+        case .annotate(.pencil):
+            let range = EditorDocument.pencilWidthRange
+            editorDocument.lineWidth = min(max(editorDocument.lineWidth + CGFloat(delta), range.lowerBound),
+                                           range.upperBound)
+            editorDocument.applyLineWidthToSelection()
+        default:
+            let weights = LineWeight.allCases
+            let current = weights.firstIndex { abs($0.lineWidth - editorDocument.lineWidth) < 0.01 } ?? 1
+            let next = min(max(current + delta, 0), weights.count - 1)
+            editorDocument.lineWidth = weights[next].lineWidth
+            editorDocument.fontSize = weights[next].fontSize
+            editorDocument.applyWeightToSelection()
+        }
     }
 
     // MARK: - NSWindowDelegate
