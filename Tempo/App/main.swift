@@ -15,6 +15,11 @@ if let index = CommandLine.arguments.firstIndex(of: "--screenshot"),
                             includingOwnWindows: CommandLine.arguments.contains("--include-self"))
 }
 
+if let index = CommandLine.arguments.firstIndex(of: "--contrast-check"),
+   CommandLine.arguments.count > index + 1 {
+    SampleRenderer.runContrastCheck(outputPath: CommandLine.arguments[index + 1])
+}
+
 if let index = CommandLine.arguments.firstIndex(of: "--render-sample") {
     let path = CommandLine.arguments.count > index + 1
         ? CommandLine.arguments[index + 1]

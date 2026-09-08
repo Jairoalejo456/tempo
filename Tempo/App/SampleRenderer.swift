@@ -26,6 +26,68 @@ enum SampleRenderer {
         }
     }
 
+    /// Comprobación de contraste: las mismas anotaciones, en todos los colores, sobre fondos
+    /// claros, oscuros y de tonos intermedios. Sirve para verificar que se leen en cualquier
+    /// caso, que es lo que justifica el contorno de contraste del renderizador.
+    static func runContrastCheck(outputPath: String) -> Never {
+        let capture = makeContrastCanvas()
+        let document = EditorDocument(capture: capture)
+        let size = capture.logicalSize
+        let columnWidth = size.width / CGFloat(AnnotationColor.palette.count)
+
+        for (index, color) in AnnotationColor.palette.enumerated() {
+            document.color = color
+            let x = columnWidth * CGFloat(index) + columnWidth / 2
+
+            document.add(Annotation(shape: .text(origin: CGPoint(x: x - 26, y: size.height - 70),
+                                                 string: "Abc"),
+                                    style: AnnotationStyle(color: color, lineWidth: 4, fontSize: 30)))
+            document.add(Annotation(shape: .arrow(from: CGPoint(x: x - 30, y: size.height - 150),
+                                                  to: CGPoint(x: x + 30, y: size.height - 110)),
+                                    style: AnnotationStyle(color: color, lineWidth: 4, fontSize: 28)))
+            document.add(Annotation(shape: .rectangle(CGRect(x: x - 34, y: size.height - 250,
+                                                             width: 68, height: 60)),
+                                    style: AnnotationStyle(color: color, lineWidth: 4, fontSize: 28)))
+            document.add(Annotation(shape: .counter(center: CGPoint(x: x, y: size.height - 300),
+                                                    number: index + 1),
+                                    style: AnnotationStyle(color: color, lineWidth: 4, fontSize: 24)))
+            document.add(Annotation(shape: .pencil(points: (0..<16).map {
+                CGPoint(x: x - 32 + Double($0) * 4, y: size.height - 370 + sin(Double($0) / 2) * 14)
+            }), style: AnnotationStyle(color: color, lineWidth: 4, fontSize: 28)))
+        }
+        document.select(nil)
+
+        do {
+            let image = try ImageExporter.compose(document: document)
+            let url = URL(fileURLWithPath: (outputPath as NSString).expandingTildeInPath)
+            try ImageExporter.write(image: image, to: url)
+            print("Comprobación de contraste en \(url.path) (\(image.width)×\(image.height) px)")
+            exit(0)
+        } catch {
+            print("No se pudo generar: \(error.localizedDescription)")
+            exit(1)
+        }
+    }
+
+    /// Bandas horizontales que van del blanco al negro, para probar el peor caso de cada color.
+    private static func makeContrastCanvas(scale: CGFloat = 2) -> CaptureImage {
+        let width: CGFloat = 760, height: CGFloat = 420
+        let context = CGContext(data: nil,
+                                width: Int(width * scale), height: Int(height * scale),
+                                bitsPerComponent: 8, bytesPerRow: 0,
+                                space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+        context.scaleBy(x: scale, y: scale)
+
+        let tones: [CGFloat] = [1.0, 0.75, 0.45, 0.16, 0.0]
+        let bandHeight = height / CGFloat(tones.count)
+        for (index, tone) in tones.enumerated() {
+            context.setFillColor(CGColor(srgbRed: tone, green: tone, blue: tone, alpha: 1))
+            context.fill(CGRect(x: 0, y: CGFloat(index) * bandHeight, width: width, height: bandHeight))
+        }
+        return CaptureImage(cgImage: context.makeImage()!, scale: scale)
+    }
+
     /// Lienzo que imita una ventana cualquiera, para ver las anotaciones sobre contenido real.
     static func makeSyntheticCapture(scale: CGFloat = 2) -> CaptureImage {
         let width: CGFloat = 720

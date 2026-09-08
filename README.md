@@ -267,6 +267,26 @@ TempoTests/     Pruebas del núcleo (42 pruebas)
 Tools/            Utilidades de desarrollo
 ```
 
+### Legibilidad sobre cualquier fondo
+
+Cada anotación se dibuja en dos pasadas: primero un **contorno de contraste** y encima la
+anotación. El color del contorno se elige por oposición a la luminancia del propio trazo —uno
+oscuro se rodea de claro y uno claro de oscuro—, así que siempre hay un salto de contraste,
+tanto sobre una ventana blanca como sobre una interfaz en modo oscuro. Incluso un texto negro
+sobre fondo negro sigue leyéndose.
+
+Sobre fondos donde el color ya destaca, el contorno pasa desapercibido y no ensucia la captura.
+El blur es la excepción: no lleva contorno, porque no es un trazo sino la propia imagen
+difuminada.
+
+Puedes comprobarlo tú mismo:
+
+```bash
+open -n /Applications/Tempo.app --args --contrast-check ~/Desktop/contraste.png
+```
+
+Genera todas las herramientas, en los ocho colores, sobre bandas que van del blanco al negro.
+
 ### Decisiones técnicas
 
 - **Un solo renderizador.** `AnnotationRenderer` dibuja tanto en el lienzo como en la imagen
