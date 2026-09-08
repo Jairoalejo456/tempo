@@ -156,7 +156,8 @@ enum SampleRenderer {
         }), style: document.currentStyle))
 
         document.color = .purple
-        document.add(Annotation(shape: .text(origin: CGPoint(x: 210, y: 400), string: "Revisar este bloque"),
+        document.add(Annotation(shape: .text(origin: CGPoint(x: 210, y: 370),
+                                             string: "Revisar este bloque antes de enviarlo"),
                                 style: document.currentStyle))
 
         // Censura del dato sensible.

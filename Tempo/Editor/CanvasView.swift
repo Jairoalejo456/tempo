@@ -322,7 +322,7 @@ final class CanvasView: NSView {
             document.place(annotation, keepingTool: keepsTool(event))
             refreshCursor()
         case .text:
-            beginTextEditing(at: point)
+            beginTextEditing(at: originForNewText(centeredOn: point))
         case .arrow, .rectangle, .ellipse, .blur, .pencil:
             gestureAnchor = point
             isDrawing = true
@@ -335,6 +335,16 @@ final class CanvasView: NSView {
         let viewLocation = convert(event.locationInWindow, from: nil)
         let imageLocation = imagePoint(from: viewLocation)
         let tolerance = handleTolerance
+
+        // Un doble clic sobre lo ya seleccionado entra a editarlo, antes que cualquier otra
+        // cosa: en un texto corto los tiradores cubren casi toda la caja y, si se miraran
+        // primero, nunca se llegaría a la edición.
+        if event.clickCount == 2,
+           let selected = document.selectedAnnotation,
+           selected.hitTest(imageLocation, tolerance: tolerance) {
+            beginEditing(selected)
+            return
+        }
 
         // 1. Un tirador de la selección actual tiene prioridad sobre todo lo demás.
         if let selected = document.selectedAnnotation,
@@ -526,6 +536,30 @@ final class CanvasView: NSView {
         }
     }
 
+    /// Mantiene la caja de un texto dentro de la captura, para que no acabe medio fuera del
+    /// encuadre al crecer en varias líneas.
+    private func clampedTextOrigin(_ origin: CGPoint, size: CGSize) -> CGPoint {
+        let imageSize = document.capture.logicalSize
+        return CGPoint(x: min(max(origin.x, 0), max(imageSize.width - size.width, 0)),
+                       y: min(max(origin.y, 0), max(imageSize.height - size.height, 0)))
+    }
+
+    /// Esquina inferior izquierda de un texto nuevo, de modo que su caja quede centrada en el
+    /// punto pulsado y entera dentro de la captura.
+    private func originForNewText(centeredOn point: CGPoint) -> CGPoint {
+        let imageSize = document.capture.logicalSize
+        var style = document.currentStyle
+        // La caja nunca es más ancha que la propia captura.
+        style.textWidth = min(style.textWidth, max(imageSize.width - 16, AnnotationStyle.minimumTextWidth))
+        document.textWidth = style.textWidth
+
+        let size = AnnotationRenderer.textSize("", style: style)
+        var origin = CGPoint(x: point.x - size.width / 2, y: point.y - size.height / 2)
+        origin.x = min(max(origin.x, 0), max(imageSize.width - size.width, 0))
+        origin.y = min(max(origin.y, 0), max(imageSize.height - size.height, 0))
+        return origin
+    }
+
     // MARK: - Edición del contenido (doble clic)
 
     /// Doble clic sobre una anotación de texto entra a reescribirla. Un contador no necesita
@@ -554,18 +588,23 @@ final class CanvasView: NSView {
 
         let style = overrideStyle ?? document.currentStyle
         let scale = displayScale
-        // El campo de edición usa la misma escala que el lienzo, de modo que el texto que se
-        // escribe tiene el tamaño exacto con el que se va a dibujar.
+        // El campo de edición usa la misma escala y la misma anchura que el lienzo, de modo que
+        // el texto se reparte en líneas exactamente igual que al dibujarlo.
         let font = NSFont.systemFont(ofSize: style.fontSize * scale, weight: .semibold)
-        let lineHeight = ceil(font.ascender - font.descender + font.leading)
+        let width = style.textWidth * scale
+        let boxSize = AnnotationRenderer.textSize(existing, style: style)
 
         let origin = viewPoint(from: point)
-        let editor = InlineTextEditor(frame: CGRect(x: origin.x, y: origin.y,
-                                                    width: max(120, bounds.maxX - origin.x - padding),
-                                                    height: lineHeight))
+        let editor = InlineTextEditor(frame: CGRect(x: origin.x,
+                                                    y: origin.y,
+                                                    width: width,
+                                                    height: boxSize.height * scale))
         editor.configure(font: font, color: NSColor(cgColor: style.color.cgColor) ?? .systemRed)
         editor.onCommit = { [weak self] in self?.commitTextEditor() }
         editor.onCancel = { [weak self] in self?.cancelTextEditor() }
+        // Al escribir, la caja crece hacia abajo manteniendo fija su esquina superior, igual
+        // que hará el texto dibujado.
+        editor.onSizeChange = { [weak self] in self?.resizeTextEditorToFitContent() }
 
         editor.string = existing
         addSubview(editor)
@@ -577,6 +616,29 @@ final class CanvasView: NSView {
         textEditor = editor
         textEditorOrigin = point
         textEditorAnnotationID = annotationID
+        resizeTextEditorToFitContent()
+    }
+
+    /// Ajusta el alto del campo al contenido, anclando su borde superior.
+    private func resizeTextEditorToFitContent() {
+        guard let editor = textEditor, let origin = textEditorOrigin else { return }
+        var style = document.currentStyle
+        if let id = textEditorAnnotationID,
+           let existing = document.annotations.first(where: { $0.id == id }) {
+            style = existing.style
+            style.color = document.color
+            style.fontSize = document.fontSize
+        }
+
+        let size = AnnotationRenderer.textSize(editor.string, style: style)
+        let scale = displayScale
+        let top = viewPoint(from: CGPoint(x: origin.x, y: origin.y + size.height)).y
+        var frame = editor.frame
+        frame.size.width = style.textWidth * scale
+        frame.size.height = size.height * scale
+        frame.origin.y = top - frame.size.height
+        editor.frame = frame
+        needsDisplay = true
     }
 
     /// Confirma el texto en edición convirtiéndolo en anotación.
@@ -588,6 +650,7 @@ final class CanvasView: NSView {
         let font = NSFont.systemFont(ofSize: style.fontSize * displayScale, weight: .semibold)
 
         editor.configure(font: font, color: color)
+        resizeTextEditorToFitContent()
         // `configure` fija los atributos de lo que se escriba a partir de ahora; esto repinta
         // lo que ya estaba escrito.
         let whole = NSRange(location: 0, length: (editor.string as NSString).length)
@@ -627,6 +690,14 @@ final class CanvasView: NSView {
                 // quedan aplicados, y si no se tocó nada, todo sigue igual.
                 var updated = existing.withText(string)
                 updated.style = document.currentStyle
+                if case let .text(textOrigin, text) = updated.shape {
+                    let newSize = AnnotationRenderer.textSize(text, style: updated.style)
+                    // El bloque crece hacia abajo al añadir líneas: se ancla su borde superior
+                    // y se confina dentro de la captura.
+                    let top = existing.localBounds.maxY
+                    let placed = CGPoint(x: textOrigin.x, y: top - newSize.height)
+                    updated.shape = .text(origin: clampedTextOrigin(placed, size: newSize), string: text)
+                }
                 document.replace(updated)
             }
             needsDisplay = true
@@ -634,7 +705,14 @@ final class CanvasView: NSView {
         }
 
         guard !trimmed.isEmpty else { return false }
-        document.place(Annotation(shape: .text(origin: origin, string: string), style: document.currentStyle))
+        // El bloque crece hacia abajo mientras se escribe: el origen se recoloca para que
+        // coincida con lo que se estaba viendo.
+        let style = document.currentStyle
+        let size = AnnotationRenderer.textSize(string, style: style)
+        let emptySize = AnnotationRenderer.textSize("", style: style)
+        let grown = CGPoint(x: origin.x, y: origin.y + emptySize.height - size.height)
+        let adjusted = clampedTextOrigin(grown, size: size)
+        document.place(Annotation(shape: .text(origin: adjusted, string: string), style: style))
         refreshCursor()
         needsDisplay = true
         return true
@@ -694,6 +772,7 @@ private final class InlineTextEditor: NSTextView {
 
     var onCommit: (() -> Void)?
     var onCancel: (() -> Void)?
+    var onSizeChange: (() -> Void)?
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -718,6 +797,11 @@ private final class InlineTextEditor: NSTextView {
         allowsUndo = true
         textContainerInset = .zero
         textContainer?.lineFragmentPadding = 0
+        // El texto se reparte en líneas dentro de la anchura del campo, igual que al dibujarlo.
+        textContainer?.widthTracksTextView = true
+        isHorizontallyResizable = false
+        isVerticallyResizable = true
+        alignment = .center
         isAutomaticQuoteSubstitutionEnabled = false
         isAutomaticDashSubstitutionEnabled = false
         isAutomaticTextReplacementEnabled = false
@@ -728,6 +812,12 @@ private final class InlineTextEditor: NSTextView {
         self.font = font
         textColor = color
         insertionPointColor = color
+        alignment = .center
+    }
+
+    override func didChangeText() {
+        super.didChangeText()
+        onSizeChange?()
     }
 
     /// ↩ confirma el texto.

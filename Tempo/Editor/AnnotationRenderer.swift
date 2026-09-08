@@ -93,10 +93,34 @@ enum AnnotationRenderer {
         max(14, style.fontSize * 0.72)
     }
 
-    /// Tamaño que ocupará un texto; lo usa el editor para colocar el campo de edición.
+    /// Tamaño que ocupará un texto dentro de su anchura; lo usa el editor para colocar el
+    /// campo de edición y la geometría para saber dónde está la anotación.
     static func textSize(_ string: String, style: AnnotationStyle) -> CGSize {
-        guard !string.isEmpty else { return CGSize(width: 0, height: style.fontSize * 1.25) }
-        return NSAttributedString(string: string, attributes: textAttributes(style: style)).size()
+        let width = max(style.textWidth, AnnotationStyle.minimumTextWidth)
+        guard !string.isEmpty else { return CGSize(width: width, height: lineHeight(for: style)) }
+
+        let attributed = NSAttributedString(string: string, attributes: textAttributes(style: style))
+        let bounds = attributed.boundingRect(
+            with: CGSize(width: width, height: .greatestFiniteMagnitude),
+            options: [.usesLineFragmentOrigin, .usesFontLeading]
+        )
+        // La anchura es siempre la de la caja: así el bloque no "baila" al escribir, y los
+        // tiradores laterales tienen algo estable que arrastrar.
+        return CGSize(width: width, height: max(ceil(bounds.height), lineHeight(for: style)))
+    }
+
+    /// Alto de una línea para un estilo dado.
+    static func lineHeight(for style: AnnotationStyle) -> CGFloat {
+        let font = NSFont.systemFont(ofSize: style.fontSize, weight: .semibold)
+        return ceil(font.ascender - font.descender + font.leading)
+    }
+
+    /// Párrafo centrado: es lo que mejor funciona para una etiqueta sobre una captura.
+    static func paragraphStyle() -> NSParagraphStyle {
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.alignment = .center
+        paragraph.lineBreakMode = .byWordWrapping
+        return paragraph
     }
 
     // MARK: - Dibujo por herramienta
@@ -254,9 +278,14 @@ enum AnnotationRenderer {
         }
 
         let attributed = NSAttributedString(string: string, attributes: attributes)
+        let size = textSize(string, style: style)
+        // `origin` es la esquina inferior izquierda del bloque; el texto se reparte en líneas
+        // dentro de esa caja en lugar de desbordarse hacia la derecha.
+        let box = CGRect(origin: origin, size: size)
         withAppKitContext(context) {
-            // `origin` es la esquina inferior izquierda del bloque de texto.
-            attributed.draw(at: origin)
+            attributed.draw(with: box,
+                            options: [.usesLineFragmentOrigin, .usesFontLeading],
+                            context: nil)
         }
     }
 
@@ -295,10 +324,11 @@ enum AnnotationRenderer {
 
     // MARK: - Utilidades
 
-    private static func textAttributes(style: AnnotationStyle) -> [NSAttributedString.Key: Any] {
+    static func textAttributes(style: AnnotationStyle) -> [NSAttributedString.Key: Any] {
         [
             .font: NSFont.systemFont(ofSize: style.fontSize, weight: .semibold),
-            .foregroundColor: NSColor(cgColor: style.color.cgColor) ?? .systemRed
+            .foregroundColor: NSColor(cgColor: style.color.cgColor) ?? .systemRed,
+            .paragraphStyle: paragraphStyle()
         ]
     }
 

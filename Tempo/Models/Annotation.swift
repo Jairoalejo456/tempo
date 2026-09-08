@@ -87,8 +87,13 @@ struct AnnotationStyle: Equatable {
     var fontSize: CGFloat
     /// Fuerza del difuminado, de 0 (apenas se nota) a 1 (irreconocible). Sólo la usa el blur.
     var blurIntensity: CGFloat = AnnotationStyle.defaultBlurIntensity
+    /// Anchura del bloque de texto. El texto se reparte en varias líneas dentro de ella en vez
+    /// de crecer indefinidamente hacia la derecha y salirse de la captura.
+    var textWidth: CGFloat = AnnotationStyle.defaultTextWidth
 
     static let defaultBlurIntensity: CGFloat = 0.5
+    static let defaultTextWidth: CGFloat = 320
+    static let minimumTextWidth: CGFloat = 60
     static let `default` = AnnotationStyle(color: .red, lineWidth: 4, fontSize: 28)
 }
 

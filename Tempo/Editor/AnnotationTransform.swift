@@ -33,6 +33,13 @@ extension Annotation {
 
         let local = toLocal(point)
         let bounds = localBounds
+
+        // Un texto se ajusta de otra manera: los laterales cambian su anchura y el texto se
+        // reparte de nuevo en líneas, en lugar de estirarse.
+        if case let .text(origin, string) = shape {
+            return resizedText(handle: handle, to: local, origin: origin, string: string, bounds: bounds)
+        }
+
         var rect = bounds
 
         switch handle {
@@ -78,6 +85,54 @@ extension Annotation {
         return withBounds(rect, from: bounds)
     }
 
+    /// Ajuste específico del texto: anchura por los lados, cuerpo de letra por las esquinas.
+    private func resizedText(handle: AnnotationHandle,
+                             to local: CGPoint,
+                             origin: CGPoint,
+                             string: String,
+                             bounds: CGRect) -> Annotation {
+        var copy = self
+
+        switch handle {
+        case .left:
+            let width = max(bounds.maxX - local.x, AnnotationStyle.minimumTextWidth)
+            copy.style.textWidth = width
+            copy.shape = .text(origin: CGPoint(x: bounds.maxX - width, y: origin.y), string: string)
+        case .right:
+            copy.style.textWidth = max(local.x - bounds.minX, AnnotationStyle.minimumTextWidth)
+        case .topLeft, .topRight, .bottomLeft, .bottomRight:
+            // Las esquinas cambian el tamaño de letra, conservando la esquina opuesta.
+            guard bounds.height > 0 else { return self }
+            let targetHeight = handle == .topLeft || handle == .topRight
+                ? max(local.y - bounds.minY, 1)
+                : max(bounds.maxY - local.y, 1)
+            let factor = targetHeight / bounds.height
+            copy.style.fontSize = min(max(style.fontSize * factor, 8), 400)
+            // La anchura acompaña al cuerpo de letra para que el bloque no cambie de forma.
+            copy.style.textWidth = max(style.textWidth * factor, AnnotationStyle.minimumTextWidth)
+        default:
+            return self
+        }
+
+        // El origen se recoloca para que la esquina que no se arrastra permanezca quieta.
+        let newSize = AnnotationRenderer.textSize(string, style: copy.style)
+        var newOrigin = CGPoint(x: bounds.minX, y: bounds.maxY - newSize.height)
+        if handle == .left {
+            newOrigin.x = bounds.maxX - newSize.width
+        }
+        if handle == .bottomLeft || handle == .bottomRight {
+            newOrigin.y = bounds.maxY - newSize.height
+        }
+        if handle == .topLeft || handle == .topRight {
+            newOrigin.y = bounds.minY
+        }
+        if handle == .topLeft || handle == .bottomLeft {
+            newOrigin.x = bounds.maxX - newSize.width
+        }
+        copy.shape = .text(origin: newOrigin, string: string)
+        return copy
+    }
+
     /// Reconstruye la forma para que ocupe `rect`, partiendo de `previous`.
     private func withBounds(_ rect: CGRect, from previous: CGRect) -> Annotation {
         var copy = self
@@ -97,14 +152,8 @@ extension Annotation {
                 CGPoint(x: rect.minX + (point.x - previous.minX) * scaleX,
                         y: rect.minY + (point.y - previous.minY) * scaleY)
             })
-        case let .text(_, string):
-            // En un texto, cambiar el tamaño de la caja cambia el cuerpo de letra.
-            guard previous.height > 0 else { return self }
-            let factor = rect.height / previous.height
-            copy.style.fontSize = min(max(style.fontSize * factor, 8), 400)
-            let newSize = AnnotationRenderer.textSize(string, style: copy.style)
-            copy.shape = .text(origin: CGPoint(x: rect.minX, y: rect.minY), string: string)
-            _ = newSize
+        case .text:
+            break // Lo gestiona `resizedText`, que reparte el texto en líneas.
         case let .counter(_, number):
             let side = max(min(rect.width, rect.height), 8)
             copy.style.fontSize = min(max(side / 2 / 0.72, 8), 400)

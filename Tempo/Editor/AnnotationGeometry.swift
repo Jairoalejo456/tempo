@@ -161,7 +161,9 @@ extension Annotation {
                 result[handle] = toImage(positions[handle]!)
             }
         case .text:
-            for handle in [AnnotationHandle.topRight, .bottomRight, .bottomLeft, .topLeft] {
+            // Los laterales cambian la anchura de la caja (el texto se reparte de nuevo en
+            // líneas) y las esquinas, el cuerpo de letra.
+            for handle in [AnnotationHandle.topRight, .bottomRight, .bottomLeft, .topLeft, .left, .right] {
                 result[handle] = toImage(positions[handle]!)
             }
         default:

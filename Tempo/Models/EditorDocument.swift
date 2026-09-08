@@ -18,6 +18,8 @@ final class EditorDocument: ObservableObject {
     @Published var fontSize: CGFloat = 28
     /// Fuerza del difuminado que se aplicará a los siguientes blurs.
     @Published var blurIntensity: CGFloat = AnnotationStyle.defaultBlurIntensity
+    /// Anchura de la caja de los siguientes textos.
+    @Published var textWidth: CGFloat = AnnotationStyle.defaultTextWidth
 
     /// Anotación que se está creando con el ratón; se dibuja pero aún no forma parte del historial.
     @Published var draft: Annotation?
@@ -45,7 +47,8 @@ final class EditorDocument: ObservableObject {
     }
 
     var currentStyle: AnnotationStyle {
-        AnnotationStyle(color: color, lineWidth: lineWidth, fontSize: fontSize, blurIntensity: blurIntensity)
+        AnnotationStyle(color: color, lineWidth: lineWidth, fontSize: fontSize,
+                        blurIntensity: blurIntensity, textWidth: textWidth)
     }
 
     /// Rango de grosor del lápiz, que se ajusta con su deslizador.
@@ -130,6 +133,9 @@ final class EditorDocument: ObservableObject {
         fontSize = annotation.style.fontSize
         if annotation.tool == .blur {
             blurIntensity = annotation.style.blurIntensity
+        }
+        if annotation.tool == .text {
+            textWidth = annotation.style.textWidth
         }
     }
 

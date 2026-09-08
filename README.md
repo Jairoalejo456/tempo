@@ -211,7 +211,8 @@ Al seleccionar algo, la barra pasa a mostrar **sus** propiedades: si eliges un t
 paleta marca azul. Así el siguiente ajuste que toques no le cambia de paso algo que no querías,
 y lo que dibujes después continúa con ese estilo.
 
-**Doble clic** sobre un texto entra a reescribirlo.
+**Doble clic** sobre un texto entra a reescribirlo, aunque el cursor caiga sobre uno de sus
+tiradores.
 
 Al terminar de colocar cualquier elemento, la herramienta vuelve sola al puntero y el elemento
 queda seleccionado, listo para ajustarlo. Si prefieres encadenar varios seguidos —varios
@@ -236,9 +237,15 @@ seleccionada— es un blur o un trazo a lápiz, así que la barra no crece por t
 
 - **Flecha**, **rectángulo** y **elipse** con color y tres tamaños.
 - **Lápiz** con color y un **deslizador de grosor** continuo, de 1 a 24 puntos.
-- **Texto**: se escribe en el sitio, con el color y el tamaño activos. Cambiarlos mientras
-  escribes repinta **todo** lo escrito, no sólo lo que teclees a partir de ahí. `↩` confirma,
-  `⌥↩` añade una línea, `Esc` cancela.
+- **Texto**: haz clic donde quieras y escribe. El bloque nace **centrado en el punto que has
+  pulsado** y el texto se reparte en varias líneas dentro de su caja, así que nunca se sale de
+  la captura por larga que sea la frase. `↩` confirma, `⌥↩` añade una línea, `Esc` cancela, y un
+  clic fuera también lo da por bueno.
+
+  Con un texto seleccionado, los tiradores **laterales** cambian la anchura de la caja —el texto
+  se reparte de nuevo— y los de las **esquinas**, el cuerpo de letra. **Doble clic** vuelve a
+  abrirlo para corregirlo o añadir más. Cambiar el color mientras escribes repinta **todo** lo
+  escrito, no sólo lo que teclees a partir de ahí.
 - **Blur**: difumina la región seleccionada para censurar datos sensibles. Su **intensidad** se
   ajusta con el deslizador de la barra, que aparece al elegir la herramienta o al seleccionar
   un blur ya puesto.
