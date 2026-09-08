@@ -36,6 +36,8 @@ final class CanvasView: NSView {
     private var cropHandle: AnnotationHandle?
     private var cropAnchor: CGPoint?
     private var cropRectAtDragStart: CGRect?
+    /// `true` mientras se dibuja un encuadre nuevo desde cero, en cualquier dirección.
+    private var isDrawingCrop = false
 
     /// Editor de texto en línea, cuando la herramienta de texto está activa.
     private var textEditor: InlineTextEditor?
@@ -143,6 +145,7 @@ final class CanvasView: NSView {
     func cancelCrop() {
         document.tool = .navigate
         cropRect = nil
+        isDrawingCrop = false
         needsDisplay = true
     }
 
@@ -157,11 +160,14 @@ final class CanvasView: NSView {
             hypot(point.x - $0.value.x, point.y - $0.value.y) < hypot(point.x - $1.value.x, point.y - $1.value.y)
         }), hypot(point.x - nearest.value.x, point.y - nearest.value.y) <= tolerance {
             cropHandle = nearest.key
-        } else if rect.contains(point) {
-            cropHandle = nil // Arrastrar dentro mueve el encuadre entero.
+        } else if rect.contains(point), rect != document.capture.logicalBounds {
+            cropHandle = nil // Arrastrar dentro mueve el encuadre entero…
+            isDrawingCrop = false
         } else {
-            // Fuera: se empieza un encuadre nuevo desde cero.
-            cropHandle = .topRight
+            // …salvo cuando el encuadre es la captura completa: ahí no hay nada que mover, y
+            // lo que se espera al arrastrar es dibujar el recorte directamente.
+            cropHandle = nil
+            isDrawingCrop = true
             cropRect = CGRect(origin: point, size: .zero)
         }
         cropAnchor = point
@@ -169,9 +175,19 @@ final class CanvasView: NSView {
     }
 
     private func handleCropDrag(_ event: NSEvent) {
-        guard let start = cropRectAtDragStart, let anchor = cropAnchor else { return }
+        guard let anchor = cropAnchor else { return }
         let point = clamped(imagePoint(from: convert(event.locationInWindow, from: nil)))
         let bounds = document.capture.logicalBounds
+
+        // Encuadre nuevo: se dibuja del ancla al cursor, en cualquiera de las cuatro
+        // direcciones, igual que al seleccionar una región de la pantalla.
+        if isDrawingCrop {
+            cropRect = CGRect.between(anchor, point).intersection(bounds)
+            needsDisplay = true
+            return
+        }
+
+        guard let start = cropRectAtDragStart else { return }
 
         if let handle = cropHandle {
             var rect = start
@@ -634,9 +650,16 @@ final class CanvasView: NSView {
 
     override func mouseUp(with event: NSEvent) {
         if document.tool == .crop {
+            // Un clic sin arrastre no define un encuadre: se vuelve al completo en lugar de
+            // dejar uno de tamaño cero que no se podría confirmar.
+            if isDrawingCrop, let rect = cropRect, rect.width < 4 || rect.height < 4 {
+                cropRect = document.capture.logicalBounds
+            }
+            isDrawingCrop = false
             cropHandle = nil
             cropAnchor = nil
             cropRectAtDragStart = nil
+            needsDisplay = true
             return
         }
 
@@ -671,8 +694,7 @@ final class CanvasView: NSView {
     }
 
     private func makeDraft(from: CGPoint, to: CGPoint, points: [CGPoint]) -> Annotation {
-        let rect = CGRect(x: min(from.x, to.x), y: min(from.y, to.y),
-                          width: abs(to.x - from.x), height: abs(to.y - from.y))
+        let rect = CGRect.between(from, to)
         let shape: AnnotationShape
         switch document.tool.annotationTool ?? .arrow {
         case .arrow: shape = .arrow(from: from, to: to)

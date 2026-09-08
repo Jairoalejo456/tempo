@@ -189,6 +189,33 @@ final class AuditTests: XCTestCase {
         XCTAssertNotEqual(wide, square, "Cada proporción tiene su propio tamaño de panel")
     }
 
+    /// Todo lo que se dibuja arrastrando debe funcionar en las cuatro direcciones. El encuadre
+    /// del recorte sólo crecía hacia arriba y a la derecha, y arrastrar hacia abajo dejaba una
+    /// franja de dos píxeles.
+    func testDragRectangleWorksInEveryDirection() {
+        let origin = CGPoint(x: 100, y: 100)
+        let corners = [
+            CGPoint(x: 180, y: 160),  // abajo-derecha en pantalla
+            CGPoint(x: 20, y: 160),
+            CGPoint(x: 180, y: 40),
+            CGPoint(x: 20, y: 40)
+        ]
+        for corner in corners {
+            let rect = CGRect.between(origin, corner)
+            XCTAssertEqual(rect.width, abs(corner.x - origin.x), accuracy: 0.001,
+                           "Ancho incorrecto arrastrando hacia \(corner)")
+            XCTAssertEqual(rect.height, abs(corner.y - origin.y), accuracy: 0.001,
+                           "Alto incorrecto arrastrando hacia \(corner)")
+            XCTAssertTrue(rect.contains(CGPoint(x: (origin.x + corner.x) / 2,
+                                                y: (origin.y + corner.y) / 2)))
+        }
+    }
+
+    func testDragRectangleFromASinglePointIsEmpty() {
+        let point = CGPoint(x: 50, y: 50)
+        XCTAssertEqual(CGRect.between(point, point), CGRect(x: 50, y: 50, width: 0, height: 0))
+    }
+
     // MARK: - Casos límite
 
     func testCancellingActionsLeavesEverythingIntact() {

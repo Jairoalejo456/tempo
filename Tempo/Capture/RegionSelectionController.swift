@@ -128,10 +128,7 @@ private final class SelectionOverlayView: NSView {
 
     private var selectionRect: CGRect? {
         guard let anchor, let current else { return nil }
-        return CGRect(x: min(anchor.x, current.x),
-                      y: min(anchor.y, current.y),
-                      width: abs(current.x - anchor.x),
-                      height: abs(current.y - anchor.y))
+        return CGRect.between(anchor, current)
     }
 
     override var acceptsFirstResponder: Bool { true }
