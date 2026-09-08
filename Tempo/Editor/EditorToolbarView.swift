@@ -97,8 +97,8 @@ struct EditorToolbarView: View {
                 ) {
                     document.tool = tool
                 }
-                // El puntero se separa del resto: no dibuja, navega.
-                if tool == .navigate {
+                // El puntero y el recorte se separan del resto: no dibujan nada.
+                if tool == .navigate || tool == .crop {
                     divider.padding(.horizontal, 3)
                 }
             }
@@ -110,6 +110,8 @@ struct EditorToolbarView: View {
         switch tool {
         case .navigate:
             return "Puntero · \(key) — arrastra para mover, rueda para acercar o alejar"
+        case .crop:
+            return "Recortar · \(key) — ajusta el encuadre y confirma con ↩"
         case .annotate:
             return "\(tool.title) · \(key)"
         }

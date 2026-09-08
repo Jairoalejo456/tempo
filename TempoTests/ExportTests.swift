@@ -88,16 +88,38 @@ final class ExportTests: XCTestCase {
         XCTAssertFalse(name.contains(":"))
     }
 
-    func testCleanTemporaryFilesEmptiesFolder() throws {
+    /// Un archivo recién arrastrado no puede borrarse: la aplicación que lo recibió puede
+    /// quedarse con la ruta y leerlo más tarde, al enviar el mensaje.
+    func testRecentDragFilesSurviveTheCleanup() throws {
         let capture = TestSupport.makeCapture(logicalWidth: 20, logicalHeight: 20, scale: 1)
         let composed = try ImageExporter.compose(capture: capture, annotations: [])
-        _ = try ImageExporter.writeTemporaryFile(image: composed, date: Date())
+        let url = try ImageExporter.writeTemporaryFile(image: composed, date: Date())
+        defer { try? FileManager.default.removeItem(at: url) }
 
         ImageExporter.cleanTemporaryFiles()
 
-        let contents = try FileManager.default.contentsOfDirectory(
-            at: ImageExporter.dragFolder, includingPropertiesForKeys: nil)
-        XCTAssertTrue(contents.isEmpty)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: url.path),
+                      "Lo recién arrastrado sigue disponible para quien lo recibió")
+    }
+
+    func testExpiredDragFilesAreRemoved() throws {
+        let capture = TestSupport.makeCapture(logicalWidth: 20, logicalHeight: 20, scale: 1)
+        let composed = try ImageExporter.compose(capture: capture, annotations: [])
+        let url = try ImageExporter.writeTemporaryFile(image: composed, date: Date())
+
+        // Se envejece el archivo más allá del plazo.
+        let old = Date().addingTimeInterval(-ImageExporter.dragFileLifetime - 60)
+        try FileManager.default.setAttributes([.modificationDate: old], ofItemAtPath: url.path)
+
+        ImageExporter.cleanTemporaryFiles()
+
+        XCTAssertFalse(FileManager.default.fileExists(atPath: url.path),
+                       "Lo que ya caducó sí se limpia")
+    }
+
+    func testCleanupUsesAGenerousLifetime() {
+        XCTAssertGreaterThanOrEqual(ImageExporter.dragFileLifetime, 60 * 60,
+                                    "El plazo debe cubrir de sobra el tiempo entre soltar y enviar")
     }
 
     /// El archivo que se arrastra debe llevar las anotaciones ya aplicadas.

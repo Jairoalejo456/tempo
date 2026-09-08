@@ -8,12 +8,15 @@ import Foundation
 enum EditorTool: Equatable, Hashable, Identifiable {
     /// Puntero: desplazar la captura arrastrando y hacer zoom con la rueda.
     case navigate
+    /// Ajustar el encuadre de la captura.
+    case crop
     /// Cualquiera de las herramientas de dibujo.
     case annotate(AnnotationTool)
 
     var id: String {
         switch self {
         case .navigate: return "navigate"
+        case .crop: return "crop"
         case let .annotate(tool): return tool.rawValue
         }
     }
@@ -21,7 +24,7 @@ enum EditorTool: Equatable, Hashable, Identifiable {
     /// Herramienta de dibujo asociada, si la hay.
     var annotationTool: AnnotationTool? {
         switch self {
-        case .navigate: return nil
+        case .navigate, .crop: return nil
         case let .annotate(tool): return tool
         }
     }
@@ -29,6 +32,7 @@ enum EditorTool: Equatable, Hashable, Identifiable {
     var title: String {
         switch self {
         case .navigate: return "Puntero"
+        case .crop: return "Recortar"
         case let .annotate(tool): return tool.title
         }
     }
@@ -36,6 +40,7 @@ enum EditorTool: Equatable, Hashable, Identifiable {
     var symbolName: String {
         switch self {
         case .navigate: return "cursorarrow"
+        case .crop: return "crop"
         case let .annotate(tool): return tool.symbolName
         }
     }
@@ -43,6 +48,7 @@ enum EditorTool: Equatable, Hashable, Identifiable {
     var shortcutKey: String {
         switch self {
         case .navigate: return "v"
+        case .crop: return "k"
         case let .annotate(tool): return tool.shortcutKey
         }
     }
@@ -50,13 +56,18 @@ enum EditorTool: Equatable, Hashable, Identifiable {
     /// Si la paleta de colores es relevante con esta herramienta.
     ///
     /// Con el puntero lo es: elegir un color mientras se navega deja preparado el que usará la
-    /// siguiente anotación. La única que lo ignora es el blur, que no pinta con color.
+    /// siguiente anotación. No lo es con el blur, que no pinta con color, ni con el recorte,
+    /// que no pinta nada en absoluto.
     var usesColor: Bool {
-        annotationTool?.usesColor ?? true
+        switch self {
+        case .navigate: return true
+        case .crop: return false
+        case let .annotate(tool): return tool.usesColor
+        }
     }
 
     /// Orden en que se muestran en la barra de herramientas.
     static var allCases: [EditorTool] {
-        [.navigate] + AnnotationTool.allCases.map(EditorTool.annotate)
+        [.navigate] + AnnotationTool.allCases.map(EditorTool.annotate) + [.crop]
     }
 }

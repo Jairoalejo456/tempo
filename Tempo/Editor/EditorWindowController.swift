@@ -205,9 +205,17 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSMenu
     private func handle(_ event: NSEvent) -> Bool {
         let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
 
+        // ↩ confirma el encuadre propuesto.
+        if event.keyCode == 36, canvas.isCropping, !canvas.isEditingText {
+            canvas.applyCrop()
+            return true
+        }
+
         // Esc va deshaciendo estados, del más concreto al más general.
         if event.keyCode == 53 {
-            if counterEntry.isTyping {
+            if canvas.isCropping {
+                canvas.cancelCrop()
+            } else if counterEntry.isTyping {
                 counterEntry.finish()
             } else if canvas.isEditingText {
                 canvas.cancelTextEditor()

@@ -33,12 +33,44 @@ final class Preferences: ObservableObject {
         }
     }
 
+    /// Tamaño con el que la imagen llega al portapapeles.
+    enum CopySize: String, CaseIterable, Identifiable, Codable {
+        case original
+        case large      // 2048 px de lado mayor
+        case standard   // 1600 px
+        case compact    // 1280 px
+
+        var id: String { rawValue }
+
+        /// Lado mayor al que se reduce, o `nil` para no tocar la imagen.
+        var maximumSide: CGFloat? {
+            switch self {
+            case .original: return nil
+            case .large: return 2048
+            case .standard: return 1600
+            case .compact: return 1280
+            }
+        }
+
+        var title: String {
+            switch self {
+            case .original: return "Tamaño original"
+            case .large: return "Reducir a 2048 px"
+            case .standard: return "Reducir a 1600 px"
+            case .compact: return "Reducir a 1280 px"
+            }
+        }
+    }
+
     private enum Key {
         static let fullScreenShortcut = "shortcut.fullScreen"
         static let regionShortcut = "shortcut.region"
         static let saveMode = "save.mode"
         static let saveFolder = "save.folder"
         static let showsDockIcon = "appearance.showsDockIcon"
+        static let copySize = "copy.size"
+        static let keepsHistory = "history.enabled"
+        static let historyDays = "history.days"
         static let hasLaunchedBefore = "app.hasLaunchedBefore"
     }
 
@@ -63,6 +95,25 @@ final class Preferences: ObservableObject {
         didSet { defaults.set(saveFolder.path, forKey: Key.saveFolder) }
     }
 
+    /// Tamaño con el que se copia al portapapeles. Guardar en disco no se toca nunca: ahí
+    /// interesa el original.
+    @Published var copySize: CopySize {
+        didSet { defaults.set(copySize.rawValue, forKey: Key.copySize) }
+    }
+
+    /// Si está activo, las capturas descartadas se conservan unos días en este Mac para poder
+    /// recuperarlas. Nunca sale nada del equipo.
+    @Published var keepsHistory: Bool {
+        didSet { defaults.set(keepsHistory, forKey: Key.keepsHistory) }
+    }
+
+    /// Días que se conserva una captura en el historial antes de borrarse sola.
+    @Published var historyDays: Int {
+        didSet { defaults.set(historyDays, forKey: Key.historyDays) }
+    }
+
+    static let historyDayOptions = [1, 3, 7, 14, 30]
+
     /// Si está activo, Tempo se comporta como una aplicación normal: icono permanente en el
     /// Dock y en el conmutador de aplicaciones. Desactivado, vive solo en la barra de menús.
     @Published var showsDockIcon: Bool {
@@ -78,6 +129,11 @@ final class Preferences: ObservableObject {
         regionShortcut = Preferences.load(from: defaults, key: Key.regionShortcut) ?? .defaultRegion
         saveMode = (defaults.string(forKey: Key.saveMode).flatMap(SaveMode.init(rawValue:))) ?? .ask
         showsDockIcon = defaults.bool(forKey: Key.showsDockIcon)
+        copySize = (defaults.string(forKey: Key.copySize).flatMap(CopySize.init(rawValue:))) ?? .standard
+        // El historial viene activado con una semana de margen: es lo bastante corto para no
+        // acumular capturas viejas y lo bastante largo para rescatar un descuido.
+        keepsHistory = defaults.object(forKey: Key.keepsHistory) as? Bool ?? true
+        historyDays = defaults.object(forKey: Key.historyDays) as? Int ?? 7
 
         if let path = defaults.string(forKey: Key.saveFolder) {
             saveFolder = URL(fileURLWithPath: path, isDirectory: true)

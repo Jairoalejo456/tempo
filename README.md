@@ -129,6 +129,7 @@ arrastre también.
 | Herramienta | Tecla |
 |---|---|
 | Puntero (mover y hacer zoom) | `V` |
+| Recortar el encuadre | `K` (`↩` confirma) |
 | Flecha | `A` |
 | Rectángulo | `R` |
 | Elipse / círculo | `O` |
@@ -163,6 +164,17 @@ Con `⇧` mantenido al dibujar: cuadrados y círculos perfectos, y flechas en á
 
 ---
 
+## Recortar
+
+Con la herramienta **Recortar** (`K`) ajustas el encuadre sin volver a capturar: arrastra los
+tiradores o dibuja un encuadre nuevo, y confirma con `↩` (`Esc` cancela). Se muestra el tamaño
+resultante en píxeles reales y unas guías en tercios.
+
+El recorte se hace sobre los píxeles nativos, así que una captura Retina recortada **sigue
+siendo Retina**. Las anotaciones se desplazan con el recorte y las que quedan fuera se
+descartan; todo ello en una sola operación de deshacer, que devuelve también los píxeles
+quitados.
+
 ## El puntero
 
 El editor abre siempre en modo **puntero** (`V`): mirar una captura y moverse por ella no debe
@@ -184,6 +196,13 @@ Se abren con `⌘,` o desde el menú de la barra superior.
   fecha y hora, y nunca se sobrescribe una anterior. Cuando se pregunta, el panel se abre en
   esa carpeta y recuerda la última que uses.
 - **Atajos** — los dos atajos globales, editables, más la lista de atajos del editor.
+- **Al copiar** — puedes reducir la imagen al copiarla. Los chats de IA reescalan las imágenes
+  por su cuenta a bastante menos de lo que mide una captura Retina, así que enviar el original
+  es mandar datos que nadie va a mirar. **Guardar en disco conserva siempre el tamaño completo.**
+- **Historial** — las capturas recientes se guardan en este Mac para poder recuperarlas si las
+  descartas sin querer, y se borran solas pasados los días que elijas (una semana por omisión).
+  Se abren desde **Capturas recientes** en el menú de la barra. No hay nube ni sincronización:
+  puedes desactivarlo o vaciarlo cuando quieras.
 - **Acerca de** — versión y compilación, y acceso directo a los ajustes de privacidad de macOS.
 
 Tempo vive en la barra de menús, pero es una aplicación normal: aparece en Spotlight, en
@@ -372,13 +391,22 @@ Y para revisar de un vistazo cómo se dibuja cada herramienta, sin necesidad de 
 ## Privacidad
 
 Todo ocurre en local. Las capturas no se suben a ningún sitio, no hay cuentas, no hay
-telemetría y no hay historial sincronizado. Los archivos temporales que se crean para poder
-arrastrar la imagen viven en el directorio temporal del sistema y se borran al cerrar la
-captura y al arrancar la aplicación.
+telemetría y no hay nada sincronizado.
+
+El historial de capturas recientes, si lo dejas activado, guarda las imágenes en la carpeta de
+soporte de la aplicación dentro de tu usuario, y las borra solas pasados los días configurados.
+Puedes desactivarlo o vaciarlo desde **Ajustes › General**.
+
+Los archivos temporales que se crean para poder arrastrar la imagen viven en el directorio
+temporal del sistema y caducan a las 24 horas. **No se borran al cerrar la captura**: al soltar
+una imagen, muchas aplicaciones no se quedan con una copia sino con la ruta del archivo, y lo
+leen más tarde —al enviar el mensaje—; si desapareciera antes, la imagen se vería como no
+disponible.
 
 ## Limitaciones conocidas
 
 - No se pueden seleccionar varias anotaciones a la vez ni agruparlas.
+- No hay reconocimiento de texto (OCR) ni captura de una ventana concreta.
 - No hay capas: el orden de dibujo es el orden en que se crearon.
 - No hay captura de ventana concreta ni con retardo, ni captura con scroll.
 - Los atajos del editor son fijos; sólo los dos globales son configurables.

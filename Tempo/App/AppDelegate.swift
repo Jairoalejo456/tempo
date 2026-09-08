@@ -17,7 +17,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         guard !isRunningTests else { return }
 
+        // Sólo se borra lo que ya caducó, no lo reciente.
         ImageExporter.cleanTemporaryFiles()
+        // Lo que haya caducado en el historial se borra al arrancar.
+        DispatchQueue.global(qos: .utility).async {
+            CaptureArchive.shared.pruneOldEntries()
+        }
         NSApp.mainMenu = MainMenu.build()
         setUpStatusItem()
         setUpHotKeys()
@@ -26,9 +31,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if CommandLine.arguments.contains("--demo") {
             let opensEditor = CommandLine.arguments.contains("--editor")
             let annotated = CommandLine.arguments.contains("--annotated")
+            let cropping = CommandLine.arguments.contains("--cropping")
             DispatchQueue.main.async {
                 AppCoordinator.shared.presentDemoCapture(openingEditor: opensEditor,
-                                                         withSampleAnnotations: annotated)
+                                                         withSampleAnnotations: annotated,
+                                                         cropping: cropping)
             }
 
             // `--shot <ruta>`: se captura a sí misma pasado un momento, con sus ventanas ya en
@@ -83,7 +90,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         HotKeyManager.shared.unregisterAll()
-        ImageExporter.cleanTemporaryFiles()
+        // Los archivos de arrastre no se tocan al salir: una imagen soltada hace un momento
+        // puede seguir pendiente de leerse en la otra aplicación.
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
@@ -143,6 +151,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         menu.addItem(.separator())
 
+        let recent = menu.addItem(withTitle: "Capturas recientes", action: nil, keyEquivalent: "")
+        recent.tag = 4
+        recent.submenu = NSMenu()
+
+        menu.addItem(.separator())
+
         let settings = menu.addItem(withTitle: "Ajustes…", action: #selector(showPreferences(_:)), keyEquivalent: ",")
         settings.target = self
 
@@ -169,6 +183,51 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc func captureRegion(_ sender: Any?) {
         AppCoordinator.shared.captureRegion()
+    }
+
+    /// Rellena el submenú de capturas recientes con lo que haya en el historial.
+    private func rebuildRecentMenu(_ item: NSMenuItem) {
+        let submenu = NSMenu()
+        let entries = Preferences.shared.keepsHistory ? CaptureArchive.shared.entries() : []
+
+        if entries.isEmpty {
+            let empty = submenu.addItem(withTitle: Preferences.shared.keepsHistory
+                                        ? "Todavía no hay capturas guardadas"
+                                        : "El historial está desactivado",
+                                        action: nil, keyEquivalent: "")
+            empty.isEnabled = false
+        } else {
+            for entry in entries.prefix(12) {
+                let entryItem = submenu.addItem(withTitle: entry.displayName,
+                                                action: #selector(openRecentCapture(_:)),
+                                                keyEquivalent: "")
+                entryItem.target = self
+                entryItem.representedObject = entry.url
+                if let image = CaptureArchive.shared.image(at: entry.url) {
+                    let thumbnail = NSImage(size: NSSize(width: 44, height: 28))
+                    thumbnail.lockFocus()
+                    image.draw(in: NSRect(x: 0, y: 0, width: 44, height: 28))
+                    thumbnail.unlockFocus()
+                    entryItem.image = thumbnail
+                }
+            }
+            submenu.addItem(.separator())
+            let clear = submenu.addItem(withTitle: "Vaciar el historial",
+                                        action: #selector(clearHistory(_:)), keyEquivalent: "")
+            clear.target = self
+        }
+
+        item.submenu = submenu
+    }
+
+    @objc func openRecentCapture(_ sender: NSMenuItem) {
+        guard let url = sender.representedObject as? URL,
+              let entry = CaptureArchive.shared.entries().first(where: { $0.url == url }) else { return }
+        Task { @MainActor in AppCoordinator.shared.reopen(entry) }
+    }
+
+    @objc func clearHistory(_ sender: Any?) {
+        CaptureArchive.shared.removeAll()
     }
 
     @objc func showPreferences(_ sender: Any?) {
@@ -202,6 +261,9 @@ extension AppDelegate: NSMenuDelegate {
         }
         if let item = menu.items.first(where: { $0.tag == 2 }) {
             item.title = "\(HotKeyManager.Action.captureRegion.title)…  ·  \(preferences.regionShortcut.display)"
+        }
+        if let item = menu.items.first(where: { $0.tag == 4 }) {
+            rebuildRecentMenu(item)
         }
         if let item = menu.items.first(where: { $0.tag == 3 }) {
             item.title = ScreenCaptureService.hasPermission

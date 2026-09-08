@@ -115,6 +115,30 @@ private struct GeneralSettingsView: View {
             Divider()
 
             VStack(alignment: .leading, spacing: 8) {
+                Text("Al copiar")
+                    .font(.system(size: 12, weight: .semibold))
+
+                Picker("", selection: $preferences.copySize) {
+                    ForEach(Preferences.CopySize.allCases) { size in
+                        Text(size.title).tag(size)
+                    }
+                }
+                .labelsHidden()
+                .frame(width: 220)
+
+                Text("Los chats de IA reescalan las imágenes por su cuenta, así que reducirlas antes de copiar ahorra tiempo de subida sin perder nada visible. Guardar en disco conserva siempre el tamaño original.")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Divider()
+
+            HistorySettings(preferences: preferences)
+
+            Divider()
+
+            VStack(alignment: .leading, spacing: 8) {
                 Text("Presencia en el sistema")
                     .font(.system(size: 12, weight: .semibold))
 
@@ -153,6 +177,69 @@ private struct GeneralSettingsView: View {
         if panel.runModal() == .OK, let url = panel.url {
             preferences.saveFolder = url
         }
+    }
+}
+
+/// Ajustes del historial local de capturas.
+private struct HistorySettings: View {
+
+    @ObservedObject var preferences: Preferences
+    @State private var storedCount = 0
+    @State private var storedSize = 0
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Historial de capturas")
+                .font(.system(size: 12, weight: .semibold))
+
+            Toggle("Guardar las capturas recientes en este Mac", isOn: $preferences.keepsHistory)
+
+            if preferences.keepsHistory {
+                HStack(spacing: 8) {
+                    Text("Borrarlas pasados")
+                        .font(.system(size: 12))
+                    Picker("", selection: $preferences.historyDays) {
+                        ForEach(Preferences.historyDayOptions, id: \.self) { days in
+                            Text(days == 1 ? "1 día" : "\(days) días").tag(days)
+                        }
+                    }
+                    .labelsHidden()
+                    .frame(width: 90)
+                }
+
+                HStack(spacing: 10) {
+                    Text(summary)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Button("Vaciar ahora") {
+                        CaptureArchive.shared.removeAll()
+                        refresh()
+                    }
+                    .controlSize(.small)
+                    .disabled(storedCount == 0)
+                }
+            }
+
+            Text("Todo se queda en tu Mac: no hay nube ni sincronización. Sirve para recuperar una captura que hayas descartado sin querer, desde «Capturas recientes» en el menú de la barra.")
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .onAppear(perform: refresh)
+        .onChange(of: preferences.keepsHistory) { _, _ in refresh() }
+    }
+
+    private var summary: String {
+        guard storedCount > 0 else { return "No hay ninguna captura guardada." }
+        let megabytes = Double(storedSize) / 1_048_576
+        let capturas = storedCount == 1 ? "1 captura guardada" : "\(storedCount) capturas guardadas"
+        return String(format: "%@ · %.1f MB", capturas, megabytes)
+    }
+
+    private func refresh() {
+        storedCount = CaptureArchive.shared.entries().count
+        storedSize = CaptureArchive.shared.totalSize()
     }
 }
 

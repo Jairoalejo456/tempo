@@ -30,6 +30,25 @@ final class CaptureImage {
         CGRect(origin: .zero, size: logicalSize)
     }
 
+    /// Devuelve una captura recortada al rectángulo dado, en coordenadas lógicas.
+    ///
+    /// El recorte se hace sobre los píxeles nativos, así que no se pierde resolución: una
+    /// captura Retina recortada sigue siendo Retina.
+    func cropped(to rect: CGRect) -> CaptureImage? {
+        let bounded = rect.intersection(logicalBounds)
+        guard bounded.width >= 1, bounded.height >= 1 else { return nil }
+
+        // De coordenadas lógicas con origen abajo‑izquierda a píxeles con origen arriba.
+        let pixelRect = CGRect(
+            x: (bounded.minX * scale).rounded(),
+            y: ((logicalSize.height - bounded.maxY) * scale).rounded(),
+            width: (bounded.width * scale).rounded(),
+            height: (bounded.height * scale).rounded()
+        )
+        guard let cut = cgImage.cropping(to: pixelRect) else { return nil }
+        return CaptureImage(cgImage: cut, scale: scale, createdAt: createdAt)
+    }
+
     /// Versiones difuminadas de la captura completa, una por nivel de intensidad.
     ///
     /// Cada anotación de blur dibuja únicamente su recorte de estas imágenes. Se guardan en

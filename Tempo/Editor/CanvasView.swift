@@ -31,6 +31,12 @@ final class CanvasView: NSView {
     /// Radio, en puntos de pantalla, de los tiradores de la selección.
     private let handleRadius: CGFloat = 4.5
 
+    /// Encuadre propuesto mientras la herramienta de recorte está activa.
+    private var cropRect: CGRect?
+    private var cropHandle: AnnotationHandle?
+    private var cropAnchor: CGPoint?
+    private var cropRectAtDragStart: CGRect?
+
     /// Editor de texto en línea, cuando la herramienta de texto está activa.
     private var textEditor: InlineTextEditor?
     private var textEditorOrigin: CGPoint?
@@ -42,6 +48,12 @@ final class CanvasView: NSView {
         self.document = document
         super.init(frame: .zero)
         wantsLayer = true
+
+        // Al activar la herramienta de recorte se propone el encuadre actual completo.
+        document.$tool
+            .receive(on: RunLoop.main)
+            .sink { [weak self] tool in self?.prepareCrop(for: tool) }
+            .store(in: &cancellables)
 
         // Cualquier cambio en el modelo repinta el lienzo.
         document.objectWillChange
@@ -99,6 +111,170 @@ final class CanvasView: NSView {
                       y: ((bounds.height - size.height) / 2 + panOffset.y).rounded(),
                       width: size.width,
                       height: size.height)
+    }
+
+    // MARK: - Recorte
+
+    var isCropping: Bool { document.tool == .crop }
+
+    private func prepareCrop(for tool: EditorTool) {
+        if tool == .crop {
+            commitTextEditor()
+            document.select(nil)
+            cropRect = document.capture.logicalBounds
+        } else {
+            cropRect = nil
+        }
+        cropHandle = nil
+        needsDisplay = true
+    }
+
+    /// Aplica el encuadre propuesto. Devuelve `false` si no había nada que recortar.
+    @discardableResult
+    func applyCrop() -> Bool {
+        guard let rect = cropRect else { return false }
+        let applied = document.crop(to: rect)
+        document.tool = .navigate
+        cropRect = nil
+        refreshViewport()
+        return applied
+    }
+
+    func cancelCrop() {
+        document.tool = .navigate
+        cropRect = nil
+        needsDisplay = true
+    }
+
+    private func handleCropMouseDown(_ event: NSEvent) {
+        guard let rect = cropRect else { return }
+        let point = imagePoint(from: convert(event.locationInWindow, from: nil))
+        let tolerance = handleTolerance
+
+        // Un tirador del encuadre, si se ha pulsado sobre uno.
+        let positions = cropHandlePositions(for: rect)
+        if let nearest = positions.min(by: {
+            hypot(point.x - $0.value.x, point.y - $0.value.y) < hypot(point.x - $1.value.x, point.y - $1.value.y)
+        }), hypot(point.x - nearest.value.x, point.y - nearest.value.y) <= tolerance {
+            cropHandle = nearest.key
+        } else if rect.contains(point) {
+            cropHandle = nil // Arrastrar dentro mueve el encuadre entero.
+        } else {
+            // Fuera: se empieza un encuadre nuevo desde cero.
+            cropHandle = .topRight
+            cropRect = CGRect(origin: point, size: .zero)
+        }
+        cropAnchor = point
+        cropRectAtDragStart = cropRect
+    }
+
+    private func handleCropDrag(_ event: NSEvent) {
+        guard let start = cropRectAtDragStart, let anchor = cropAnchor else { return }
+        let point = clamped(imagePoint(from: convert(event.locationInWindow, from: nil)))
+        let bounds = document.capture.logicalBounds
+
+        if let handle = cropHandle {
+            var rect = start
+            switch handle {
+            case .topLeft, .left, .bottomLeft:
+                rect.size.width = max(start.maxX - point.x, 1)
+                rect.origin.x = min(point.x, start.maxX - 1)
+            case .topRight, .right, .bottomRight:
+                rect.size.width = max(point.x - start.minX, 1)
+            default: break
+            }
+            switch handle {
+            case .bottomLeft, .bottom, .bottomRight:
+                rect.size.height = max(start.maxY - point.y, 1)
+                rect.origin.y = min(point.y, start.maxY - 1)
+            case .topLeft, .top, .topRight:
+                rect.size.height = max(point.y - start.minY, 1)
+            default: break
+            }
+            cropRect = rect.intersection(bounds)
+        } else {
+            // Mover el encuadre completo, sin salirse de la captura.
+            var moved = start.offsetBy(dx: point.x - anchor.x, dy: point.y - anchor.y)
+            moved.origin.x = min(max(moved.origin.x, 0), max(bounds.width - moved.width, 0))
+            moved.origin.y = min(max(moved.origin.y, 0), max(bounds.height - moved.height, 0))
+            cropRect = moved
+        }
+        needsDisplay = true
+    }
+
+    private func cropHandlePositions(for rect: CGRect) -> [AnnotationHandle: CGPoint] {
+        [
+            .topLeft: CGPoint(x: rect.minX, y: rect.maxY),
+            .top: CGPoint(x: rect.midX, y: rect.maxY),
+            .topRight: CGPoint(x: rect.maxX, y: rect.maxY),
+            .right: CGPoint(x: rect.maxX, y: rect.midY),
+            .bottomRight: CGPoint(x: rect.maxX, y: rect.minY),
+            .bottom: CGPoint(x: rect.midX, y: rect.minY),
+            .bottomLeft: CGPoint(x: rect.minX, y: rect.minY),
+            .left: CGPoint(x: rect.minX, y: rect.midY)
+        ]
+    }
+
+    /// Dibuja el velo y el encuadre propuesto.
+    private func drawCropOverlay(in context: CGContext) {
+        guard let rect = cropRect else { return }
+        let frame = imageFrame
+        let viewRect = CGRect(x: viewPoint(from: CGPoint(x: rect.minX, y: rect.minY)).x,
+                              y: viewPoint(from: CGPoint(x: rect.minX, y: rect.minY)).y,
+                              width: rect.width * displayScale,
+                              height: rect.height * displayScale)
+
+        context.saveGState()
+        // Lo que quedaría fuera se atenúa.
+        context.setFillColor(NSColor.black.withAlphaComponent(0.45).cgColor)
+        context.addRect(frame)
+        context.addRect(viewRect)
+        context.fillPath(using: .evenOdd)
+
+        context.setStrokeColor(NSColor.white.cgColor)
+        context.setLineWidth(1)
+        context.stroke(viewRect.insetBy(dx: 0.5, dy: 0.5))
+
+        // Guías en tercios, que ayudan a encuadrar.
+        context.setStrokeColor(NSColor.white.withAlphaComponent(0.35).cgColor)
+        context.beginPath()
+        for index in 1...2 {
+            let fraction = CGFloat(index) / 3
+            context.move(to: CGPoint(x: viewRect.minX + viewRect.width * fraction, y: viewRect.minY))
+            context.addLine(to: CGPoint(x: viewRect.minX + viewRect.width * fraction, y: viewRect.maxY))
+            context.move(to: CGPoint(x: viewRect.minX, y: viewRect.minY + viewRect.height * fraction))
+            context.addLine(to: CGPoint(x: viewRect.maxX, y: viewRect.minY + viewRect.height * fraction))
+        }
+        context.strokePath()
+
+        for (_, position) in cropHandlePositions(for: rect) {
+            let point = viewPoint(from: position)
+            let box = CGRect(x: point.x - handleRadius, y: point.y - handleRadius,
+                             width: handleRadius * 2, height: handleRadius * 2)
+            context.setFillColor(NSColor.white.cgColor)
+            context.fill(box)
+        }
+
+        // Tamaño resultante, en píxeles reales.
+        let pixels = "\(Int((rect.width * document.capture.scale).rounded())) × \(Int((rect.height * document.capture.scale).rounded())) px"
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .medium),
+            .foregroundColor: NSColor.white
+        ]
+        let text = NSAttributedString(string: pixels, attributes: attributes)
+        let size = text.size()
+        let badge = CGRect(x: viewRect.midX - size.width / 2 - 6,
+                           y: max(viewRect.minY - size.height - 10, frame.minY + 4),
+                           width: size.width + 12, height: size.height + 6)
+        context.setFillColor(NSColor.black.withAlphaComponent(0.75).cgColor)
+        context.addPath(CGPath(roundedRect: badge, cornerWidth: 5, cornerHeight: 5, transform: nil))
+        context.fillPath()
+        let previous = NSGraphicsContext.current
+        NSGraphicsContext.current = NSGraphicsContext(cgContext: context, flipped: false)
+        text.draw(at: CGPoint(x: badge.minX + 6, y: badge.minY + 3))
+        NSGraphicsContext.current = previous
+
+        context.restoreGState()
     }
 
     // MARK: - Zoom
@@ -213,7 +389,9 @@ final class CanvasView: NSView {
 
         // La selección se dibuja fuera de la escala de la imagen para que su grosor y sus
         // tiradores midan siempre lo mismo en pantalla, sea cual sea el zoom.
-        if let selected = document.selectedAnnotation, document.draft == nil {
+        if isCropping {
+            drawCropOverlay(in: context)
+        } else if let selected = document.selectedAnnotation, document.draft == nil {
             drawSelection(for: selected, in: context)
         }
     }
@@ -273,7 +451,7 @@ final class CanvasView: NSView {
         case .navigate:
             // Con el puntero, la mano cerrada sólo mientras se arrastra el fondo.
             addCursorRect(bounds, cursor: isPanning ? .closedHand : .arrow)
-        case .annotate:
+        case .crop, .annotate:
             addCursorRect(imageFrame, cursor: .crosshair)
         }
     }
@@ -302,6 +480,11 @@ final class CanvasView: NSView {
 
         // Puntero: selecciona, mueve, redimensiona y gira lo ya dibujado; sobre zona vacía,
         // desplaza la captura.
+        if document.tool == .crop {
+            handleCropMouseDown(event)
+            return
+        }
+
         if document.tool == .navigate {
             handlePointerMouseDown(event)
             return
@@ -388,6 +571,11 @@ final class CanvasView: NSView {
     }
 
     override func mouseDragged(with event: NSEvent) {
+        if document.tool == .crop {
+            handleCropDrag(event)
+            return
+        }
+
         if let manipulation {
             applyManipulation(manipulation, with: event)
             return
@@ -445,6 +633,13 @@ final class CanvasView: NSView {
     }
 
     override func mouseUp(with event: NSEvent) {
+        if document.tool == .crop {
+            cropHandle = nil
+            cropAnchor = nil
+            cropRectAtDragStart = nil
+            return
+        }
+
         if manipulation != nil {
             manipulation = nil
             document.endInteractiveChange()

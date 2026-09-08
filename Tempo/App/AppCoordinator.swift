@@ -61,7 +61,9 @@ final class AppCoordinator: NSObject {
     /// Abre una captura de ejemplo para poder probar el editor sin necesidad del permiso de
     /// grabación de pantalla. Se activa con `--demo`.
     @MainActor
-    func presentDemoCapture(openingEditor: Bool = false, withSampleAnnotations: Bool = false) {
+    func presentDemoCapture(openingEditor: Bool = false,
+                            withSampleAnnotations: Bool = false,
+                            cropping: Bool = false) {
         present(capture: SampleRenderer.makeSyntheticCapture(), on: NSScreen.main)
         guard let session = sessions.last else { return }
         if withSampleAnnotations {
@@ -69,6 +71,9 @@ final class AppCoordinator: NSObject {
         }
         guard openingEditor else { return }
         openEditor(for: session)
+        if cropping {
+            session.document.tool = .crop
+        }
     }
 
     // MARK: - Presentación
@@ -79,6 +84,7 @@ final class AppCoordinator: NSObject {
         sessions.append(session)
         showThumbnail(for: session)
         prewarmDragFile(for: session)
+        archive(session)
     }
 
     /// Componer una pantalla completa Retina cuesta unos milisegundos que se notarían justo
@@ -175,7 +181,8 @@ final class AppCoordinator: NSObject {
         session.editor?.flushPendingEdits()
         do {
             let image = try ImageExporter.compose(document: session.document)
-            try ImageExporter.copyToPasteboard(image: image)
+            let limit = Preferences.shared.copySize.maximumSide
+            try ImageExporter.copyToPasteboard(image: image, maximumSide: limit)
             HUDPresenter.show("Copiado al portapapeles", symbol: "checkmark.circle.fill", on: session.screen)
             // Copiar cierra el flujo: la imagen ya está lista para pegarse con ⌘V.
             close(session)
@@ -249,16 +256,42 @@ final class AppCoordinator: NSObject {
 
     // MARK: - Cierre
 
+    /// Guarda la captura en el historial local, para poder recuperarla si se descarta.
+    private func archive(_ session: CaptureSession) {
+        guard Preferences.shared.keepsHistory else { return }
+        let document = session.document
+        let id = session.id
+        let date = document.capture.createdAt
+        DispatchQueue.global(qos: .utility).async {
+            guard let image = try? ImageExporter.compose(document: document) else { return }
+            CaptureArchive.shared.store(image: image, id: id, date: date)
+        }
+    }
+
+    /// Vuelve a abrir una captura guardada como miniatura flotante.
+    @MainActor
+    func reopen(_ entry: CaptureArchive.Entry) {
+        guard let image = CaptureArchive.shared.image(at: entry.url),
+              let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
+            return
+        }
+        // El historial guarda píxeles, no la escala de origen: se recupera a escala 1, que es
+        // como se comportaría cualquier imagen abierta desde disco.
+        let capture = CaptureImage(cgImage: cgImage, scale: 1, createdAt: entry.date)
+        present(capture: capture, on: NSScreen.main)
+    }
+
     @MainActor
     func close(_ session: CaptureSession) {
+        // Al cerrar se archiva la versión con anotaciones, que reemplaza a la original.
+        archive(session)
         session.editor?.hideWindow()
         session.editor?.window?.close()
         session.editor = nil
         session.thumbnail?.close(animated: true)
         session.thumbnail = nil
-        if let url = session.dragFileURL {
-            try? FileManager.default.removeItem(at: url)
-        }
+        // El archivo que se haya arrastrado se deja donde está: quien lo recibió puede no
+        // haberlo leído todavía. Caduca solo pasadas unas horas.
         sessions.removeAll { $0.id == session.id }
         restackThumbnails()
         updateActivationPolicy()
@@ -353,9 +386,8 @@ extension AppCoordinator: ThumbnailWindowDelegate {
         }
 
         do {
-            if let previous = session.dragFileURL {
-                try? FileManager.default.removeItem(at: previous)
-            }
+            // El archivo anterior no se borra: si ya se arrastró a algún sitio, puede que aún
+            // no lo hayan leído. Se genera uno nuevo y ambos caducan por su cuenta.
             let image = try ImageExporter.compose(document: session.document)
             let url = try ImageExporter.writeTemporaryFile(image: image, date: session.document.capture.createdAt)
             session.dragFileURL = url

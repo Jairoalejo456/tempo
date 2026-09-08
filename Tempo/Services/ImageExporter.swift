@@ -47,6 +47,33 @@ enum ImageExporter {
         try compose(capture: document.capture, annotations: document.annotations)
     }
 
+    // MARK: - Reducir
+
+    /// Reduce la imagen para que su lado mayor no pase de `maximumSide`.
+    ///
+    /// Una captura Retina ronda los 2800 px de ancho, pero los chats de inteligencia artificial
+    /// reescalan internamente a bastante menos, así que enviar el original es mandar datos que
+    /// nadie va a mirar. Guardar en disco sí conserva siempre el tamaño completo.
+    static func resized(_ image: CGImage, maximumSide: CGFloat) -> CGImage {
+        let longest = CGFloat(max(image.width, image.height))
+        guard longest > maximumSide, maximumSide > 0 else { return image }
+
+        let factor = maximumSide / longest
+        let width = Int((CGFloat(image.width) * factor).rounded())
+        let height = Int((CGFloat(image.height) * factor).rounded())
+        guard width > 0, height > 0 else { return image }
+
+        let colorSpace = CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB()
+        guard let context = CGContext(data: nil, width: width, height: height,
+                                      bitsPerComponent: 8, bytesPerRow: 0, space: colorSpace,
+                                      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else {
+            return image
+        }
+        context.interpolationQuality = .high
+        context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+        return context.makeImage() ?? image
+    }
+
     // MARK: - Codificación
 
     static func pngData(from image: CGImage) throws -> Data {
@@ -63,7 +90,8 @@ enum ImageExporter {
     /// Coloca la imagen en el portapapeles como PNG y TIFF, para que cualquier aplicación
     /// (navegadores, editores, apps de chat) pueda pegarla con ⌘V.
     @discardableResult
-    static func copyToPasteboard(image: CGImage) throws -> Bool {
+    static func copyToPasteboard(image: CGImage, maximumSide: CGFloat? = nil) throws -> Bool {
+        let image = maximumSide.map { resized(image, maximumSide: $0) } ?? image
         let data = try pngData(from: image)
         let representation = NSBitmapImageRep(cgImage: image)
         let pasteboard = NSPasteboard.general
@@ -131,12 +159,29 @@ enum ImageExporter {
         return url
     }
 
-    /// Limpia los archivos temporales de sesiones anteriores al arrancar.
-    static func cleanTemporaryFiles() {
+    /// Cuánto tiempo se conserva un archivo de arrastre antes de considerarlo caducado.
+    static let dragFileLifetime: TimeInterval = 24 * 60 * 60
+
+    /// Borra los archivos de arrastre que ya han caducado.
+    ///
+    /// Es importante **no** borrarlos en cuanto se cierra la captura: al soltar una imagen,
+    /// muchas aplicaciones no se quedan con una copia sino con la ruta del archivo, y sólo lo
+    /// leen más tarde —por ejemplo al enviar el mensaje—. Si el archivo hubiera desaparecido
+    /// para entonces, la imagen aparecería como no disponible en el chat.
+    static func cleanTemporaryFiles(olderThan lifetime: TimeInterval = dragFileLifetime) {
         let folder = dragFolder
-        guard let contents = try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil) else { return }
+        let manager = FileManager.default
+        guard let contents = try? manager.contentsOfDirectory(
+            at: folder,
+            includingPropertiesForKeys: [.contentModificationDateKey]) else { return }
+
+        let deadline = Date().addingTimeInterval(-lifetime)
         for file in contents {
-            try? FileManager.default.removeItem(at: file)
+            let modified = (try? file.resourceValues(forKeys: [.contentModificationDateKey]))?
+                .contentModificationDate ?? .distantPast
+            if modified < deadline {
+                try? manager.removeItem(at: file)
+            }
         }
     }
 }

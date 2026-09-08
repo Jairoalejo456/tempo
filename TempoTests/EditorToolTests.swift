@@ -22,9 +22,18 @@ final class EditorToolTests: XCTestCase {
         XCTAssertEqual(EditorTool.navigate.shortcutKey, "v")
     }
 
-    func testPointerIsFirstInTheToolbar() {
+    func testToolbarStartsWithThePointerAndEndsWithCrop() {
         XCTAssertEqual(EditorTool.allCases.first, .navigate)
-        XCTAssertEqual(EditorTool.allCases.count, AnnotationTool.allCases.count + 1)
+        XCTAssertEqual(EditorTool.allCases.last, .crop,
+                       "Recortar va al final: no dibuja, cambia el encuadre")
+        // Puntero + herramientas de dibujo + recorte.
+        XCTAssertEqual(EditorTool.allCases.count, AnnotationTool.allCases.count + 2)
+    }
+
+    func testCropIsNotAnAnnotationTool() {
+        XCTAssertNil(EditorTool.crop.annotationTool)
+        XCTAssertFalse(EditorTool.crop.usesColor, "Recortar no pinta nada")
+        XCTAssertEqual(EditorTool.crop.shortcutKey, "k")
     }
 
     func testColorPaletteStaysAvailableWithThePointer() {

@@ -4,8 +4,22 @@ import Foundation
 
 /// Estado editable de una captura: las anotaciones, la herramienta y el color activos,
 /// y las pilas de deshacer/rehacer. No sabe nada de ventanas ni de AppKit.
+/// Estado completo del documento en un instante dado.
+///
+/// El historial guarda la captura además de las anotaciones porque recortar cambia la propia
+/// imagen, y deshacer un recorte tiene que devolver también los píxeles que se quitaron.
+struct DocumentSnapshot: Equatable {
+    var capture: CaptureImage
+    var annotations: [Annotation]
+
+    static func == (lhs: DocumentSnapshot, rhs: DocumentSnapshot) -> Bool {
+        lhs.capture === rhs.capture && lhs.annotations == rhs.annotations
+    }
+}
+
 final class EditorDocument: ObservableObject {
-    let capture: CaptureImage
+    /// Captura sobre la que se trabaja. Cambia al recortar.
+    @Published private(set) var capture: CaptureImage
     let id = UUID()
 
     @Published private(set) var annotations: [Annotation] = []
@@ -39,8 +53,17 @@ final class EditorDocument: ObservableObject {
     var effectiveZoom: CGFloat { fitScale * zoomFactor }
 
     // Publicadas para que la barra de herramientas active o desactive los botones al instante.
-    @Published private var undoStack: [[Annotation]] = []
-    @Published private var redoStack: [[Annotation]] = []
+    @Published private var undoStack: [DocumentSnapshot] = []
+    @Published private var redoStack: [DocumentSnapshot] = []
+
+    private var snapshot: DocumentSnapshot {
+        DocumentSnapshot(capture: capture, annotations: annotations)
+    }
+
+    private func restore(_ state: DocumentSnapshot) {
+        capture = state.capture
+        annotations = state.annotations
+    }
 
     init(capture: CaptureImage) {
         self.capture = capture
@@ -75,11 +98,11 @@ final class EditorDocument: ObservableObject {
 
     /// Aplica un cambio registrándolo en el historial de deshacer.
     func perform(_ change: (inout [Annotation]) -> Void) {
-        let snapshot = annotations
+        let previous = snapshot
         var copy = annotations
         change(&copy)
         guard copy != annotations else { return }
-        undoStack.append(snapshot)
+        undoStack.append(previous)
         redoStack.removeAll()
         annotations = copy
     }
@@ -162,11 +185,11 @@ final class EditorDocument: ObservableObject {
 
     /// Snapshot tomado al empezar un arrastre, para que toda la interacción cuente como una
     /// sola operación de deshacer en lugar de una por cada movimiento del ratón.
-    private var interactionSnapshot: [Annotation]?
+    private var interactionSnapshot: DocumentSnapshot?
 
     func beginInteractiveChange() {
         guard interactionSnapshot == nil else { return }
-        interactionSnapshot = annotations
+        interactionSnapshot = snapshot
     }
 
     /// Actualiza la anotación sin tocar el historial. Se usa durante el arrastre.
@@ -176,11 +199,40 @@ final class EditorDocument: ObservableObject {
     }
 
     func endInteractiveChange() {
-        guard let snapshot = interactionSnapshot else { return }
+        guard let previous = interactionSnapshot else { return }
         interactionSnapshot = nil
-        guard snapshot != annotations else { return }
-        undoStack.append(snapshot)
+        guard previous != snapshot else { return }
+        undoStack.append(previous)
         redoStack.removeAll()
+    }
+
+    // MARK: - Recortar
+
+    /// Recorta la captura al rectángulo dado, en coordenadas de la imagen.
+    ///
+    /// Las anotaciones se desplazan con el recorte, y las que quedan completamente fuera del
+    /// nuevo encuadre se descartan. Todo ello en una sola operación de deshacer.
+    @discardableResult
+    func crop(to rect: CGRect) -> Bool {
+        guard let cut = capture.cropped(to: rect) else { return false }
+        let bounded = rect.intersection(capture.logicalBounds)
+        guard bounded.size != capture.logicalSize || bounded.origin != .zero else { return false }
+
+        let previous = snapshot
+        let offset = CGSize(width: -bounded.minX, height: -bounded.minY)
+        let newBounds = CGRect(origin: .zero, size: cut.logicalSize)
+
+        let moved = annotations
+            .map { $0.moved(by: offset) }
+            .filter { $0.localBounds.intersects(newBounds) }
+
+        undoStack.append(previous)
+        redoStack.removeAll()
+        capture = cut
+        annotations = moved
+        pruneSelection()
+        zoomFactor = 1
+        return true
     }
 
     // MARK: - Estilo de lo seleccionado
@@ -239,15 +291,15 @@ final class EditorDocument: ObservableObject {
 
     func undo() {
         guard let previous = undoStack.popLast() else { return }
-        redoStack.append(annotations)
-        annotations = previous
+        redoStack.append(snapshot)
+        restore(previous)
         pruneSelection()
     }
 
     func redo() {
         guard let next = redoStack.popLast() else { return }
-        undoStack.append(annotations)
-        annotations = next
+        undoStack.append(snapshot)
+        restore(next)
         pruneSelection()
     }
 
