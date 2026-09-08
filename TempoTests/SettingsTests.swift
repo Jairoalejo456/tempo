@@ -117,6 +117,36 @@ final class SettingsTests: XCTestCase {
         XCTAssertFalse(Preferences.buildNumber.isEmpty)
     }
 
+    // MARK: - Al arrastrar
+
+    func testThumbnailIsDismissedOnlyWhenTheDropWasAccepted() {
+        // Entregada y con el ajuste activo: se retira.
+        XCTAssertTrue(AppCoordinator.shouldDismissThumbnail(afterDragAccepted: true, preference: true))
+
+        // Arrastre cancelado: no se ha entregado nada, así que la miniatura sigue ahí.
+        XCTAssertFalse(AppCoordinator.shouldDismissThumbnail(afterDragAccepted: false, preference: true),
+                       "Soltar en un sitio que no acepta la imagen no puede hacerla desaparecer")
+
+        // Con el ajuste desactivado se conserva siempre.
+        XCTAssertFalse(AppCoordinator.shouldDismissThumbnail(afterDragAccepted: true, preference: false))
+        XCTAssertFalse(AppCoordinator.shouldDismissThumbnail(afterDragAccepted: false, preference: false))
+    }
+
+    func testDismissAfterDragIsOnByDefault() throws {
+        let (preferences, _, suite) = try makeIsolatedPreferences()
+        defer { UserDefaults.standard.removePersistentDomain(forName: suite) }
+        XCTAssertTrue(preferences.dismissesAfterDrag,
+                      "Entregada la captura, lo normal es que la miniatura se quite de en medio")
+    }
+
+    func testDismissAfterDragPersists() throws {
+        let (preferences, defaults, suite) = try makeIsolatedPreferences()
+        defer { UserDefaults.standard.removePersistentDomain(forName: suite) }
+
+        preferences.dismissesAfterDrag = false
+        XCTAssertFalse(Preferences(defaults: defaults).dismissesAfterDrag)
+    }
+
     // MARK: - Presencia en el sistema
 
     func testDockIconIsOffByDefault() throws {

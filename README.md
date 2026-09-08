@@ -18,7 +18,8 @@ estás trabajando: arrastrando la miniatura, o pegando con ⌘V.
 2. Aparece una **miniatura flotante** en la esquina inferior derecha, por encima de todo lo
    demás y sin robarte el foco.
 3. Desde ahí puedes:
-   - **Arrastrarla** directamente al navegador o a una app de escritorio.
+   - **Arrastrarla** directamente al navegador o a una app de escritorio. Una vez entregada, la
+     miniatura se desvanece sola; si el arrastre se cancela, se queda donde estaba.
    - **Hacer clic** para abrir el editor y anotarla.
    - **Cerrarla** con la ✕ que aparece al pasar el ratón por encima.
 4. En el editor anotas y terminas con **Copiar** (⌘C) o **Guardar** (⌘S). Si no necesitas
@@ -27,7 +28,8 @@ estás trabajando: arrastrando la miniatura, o pegando con ⌘V.
 5. Si cierras el editor sin descartar (⌘W o Esc), la captura **vuelve a ser miniatura** y
    sigue disponible para arrastrarla más tarde.
 
-Puedes tener varias capturas vivas a la vez: las miniaturas se apilan en la esquina.
+Puedes tener varias capturas vivas a la vez: las miniaturas se apilan en la esquina. Y si una
+se retira antes de tiempo, sigue estando en **Capturas recientes**, en el menú de la barra.
 
 ---
 
@@ -196,6 +198,8 @@ Se abren con `⌘,` o desde el menú de la barra superior.
   fecha y hora, y nunca se sobrescribe una anterior. Cuando se pregunta, el panel se abre en
   esa carpeta y recuerda la última que uses.
 - **Atajos** — los dos atajos globales, editables, más la lista de atajos del editor.
+- **Al arrastrar** — si la miniatura se retira sola al soltarla en otra aplicación. Desactívalo
+  si quieres llevar la misma captura a varios sitios seguidos.
 - **Al copiar** — puedes reducir la imagen al copiarla. Los chats de IA reescalan las imágenes
   por su cuenta a bastante menos de lo que mide una captura Retina, así que enviar el original
   es mandar datos que nadie va a mirar. **Guardar en disco conserva siempre el tamaño completo.**

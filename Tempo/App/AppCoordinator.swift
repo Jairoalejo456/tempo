@@ -400,7 +400,22 @@ extension AppCoordinator: ThumbnailWindowDelegate {
     }
 
     func thumbnailDidFinishDrag(_ controller: ThumbnailWindowController, accepted: Bool) {
-        // La miniatura se conserva tras arrastrar para poder soltarla en varios sitios.
+        guard AppCoordinator.shouldDismissThumbnail(afterDragAccepted: accepted,
+                                                    preference: Preferences.shared.dismissesAfterDrag),
+              let session = session(with: controller.sessionID) else {
+            return
+        }
+        Task { @MainActor in self.close(session) }
+    }
+
+    /// Decide si la miniatura debe retirarse después de un arrastre.
+    ///
+    /// Sólo cuenta cuando el destino aceptó la imagen: si el arrastre se cancela y la miniatura
+    /// vuelve a su sitio, no se ha entregado nada y debe seguir ahí. Y si el ajuste está
+    /// desactivado, se conserva siempre, que es lo cómodo para soltar la misma captura en
+    /// varios sitios seguidos.
+    static func shouldDismissThumbnail(afterDragAccepted accepted: Bool, preference: Bool) -> Bool {
+        accepted && preference
     }
 
     func thumbnailRequestedCopy(_ controller: ThumbnailWindowController) {

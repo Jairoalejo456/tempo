@@ -69,6 +69,7 @@ final class Preferences: ObservableObject {
         static let saveFolder = "save.folder"
         static let showsDockIcon = "appearance.showsDockIcon"
         static let copySize = "copy.size"
+        static let dismissesAfterDrag = "drag.dismisses"
         static let keepsHistory = "history.enabled"
         static let historyDays = "history.days"
         static let hasLaunchedBefore = "app.hasLaunchedBefore"
@@ -99,6 +100,12 @@ final class Preferences: ObservableObject {
     /// interesa el original.
     @Published var copySize: CopySize {
         didSet { defaults.set(copySize.rawValue, forKey: Key.copySize) }
+    }
+
+    /// Si está activo, la miniatura se desvanece sola después de soltar la captura en otra
+    /// aplicación: lo normal es que, una vez entregada, ya no haga falta.
+    @Published var dismissesAfterDrag: Bool {
+        didSet { defaults.set(dismissesAfterDrag, forKey: Key.dismissesAfterDrag) }
     }
 
     /// Si está activo, las capturas descartadas se conservan unos días en este Mac para poder
@@ -132,6 +139,7 @@ final class Preferences: ObservableObject {
         copySize = (defaults.string(forKey: Key.copySize).flatMap(CopySize.init(rawValue:))) ?? .standard
         // El historial viene activado con una semana de margen: es lo bastante corto para no
         // acumular capturas viejas y lo bastante largo para rescatar un descuido.
+        dismissesAfterDrag = defaults.object(forKey: Key.dismissesAfterDrag) as? Bool ?? true
         keepsHistory = defaults.object(forKey: Key.keepsHistory) as? Bool ?? true
         historyDays = defaults.object(forKey: Key.historyDays) as? Int ?? 7
 

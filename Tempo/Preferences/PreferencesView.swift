@@ -115,6 +115,23 @@ private struct GeneralSettingsView: View {
             Divider()
 
             VStack(alignment: .leading, spacing: 8) {
+                Text("Al arrastrar")
+                    .font(.system(size: 12, weight: .semibold))
+
+                Toggle("Retirar la miniatura al soltarla en otra aplicación",
+                       isOn: $preferences.dismissesAfterDrag)
+
+                Text(preferences.dismissesAfterDrag
+                     ? "Una vez entregada la captura, la miniatura se desvanece sola. Si el arrastre se cancela, se queda donde está."
+                     : "La miniatura se conserva tras soltarla, para poder llevar la misma captura a varios sitios.")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Divider()
+
+            VStack(alignment: .leading, spacing: 8) {
                 Text("Al copiar")
                     .font(.system(size: 12, weight: .semibold))
 
