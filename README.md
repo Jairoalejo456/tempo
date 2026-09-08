@@ -140,7 +140,7 @@ arrastre también.
 | Acción | Atajo |
 |---|---|
 | Mover lo seleccionado | flechas (`⇧` = 10 px) |
-| Renumerar el contador seleccionado | teclear el número |
+| Renumerar el contador seleccionado | teclear el número (`⌫` corrige) |
 | Seguir con la misma herramienta | `⌥` al soltar |
 | Eliminar lo seleccionado | `⌫` |
 | Quitar la selección | `Esc` |
@@ -207,8 +207,7 @@ cualquiera de ellas:
 - **`⌫`** para eliminarla, o el botón de papelera de la barra.
 - Cambiar de **color o grosor** con algo seleccionado lo aplica a esa anotación.
 
-**Doble clic** entra a editar el contenido: el texto de una anotación de texto, o el número de
-un contador.
+**Doble clic** sobre un texto entra a reescribirlo.
 
 Al terminar de colocar cualquier elemento, la herramienta vuelve sola al puntero y el elemento
 queda seleccionado, listo para ajustarlo. Si prefieres encadenar varios seguidos —varios
@@ -216,9 +215,10 @@ contadores, varios trazos— mantén **⌥** al soltar el ratón y la herramient
 
 ### Contadores con el número que quieras
 
-Los contadores se numeran solos al ponerlos, pero no estás atado a ese orden. Con uno
-seleccionado tienes tres formas de cambiarlo: **teclear el número** directamente, el control
-**N.º** de la barra, o **doble clic** sobre él.
+Los contadores se numeran solos al ponerlos, pero no estás atado a ese orden. Selecciona uno y
+**teclea el número**: cambia al instante, sin cuadros ni confirmaciones. Los dígitos seguidos
+se componen —`2` y luego `5` dan 25— y `⌫` corrige el último. Toda la secuencia cuenta como un
+solo deshacer. También está el control **N.º** de la barra, si prefieres el ratón.
 Si tienes el 1, 2 y 3 y quieres que el siguiente sea el 8, lo pones y ya está; a partir de ahí
 la numeración automática continúa desde el mayor que exista.
 

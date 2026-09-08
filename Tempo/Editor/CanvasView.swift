@@ -37,9 +37,6 @@ final class CanvasView: NSView {
     /// Si se está reeditando un texto ya existente en lugar de crear uno nuevo.
     private var textEditorAnnotationID: UUID?
 
-    /// Editor del número de un contador ya colocado.
-    private var counterEditor: NSTextField?
-    private var counterEditorAnnotationID: UUID?
 
     init(document: EditorDocument) {
         self.document = document
@@ -522,79 +519,12 @@ final class CanvasView: NSView {
 
     // MARK: - Edición del contenido (doble clic)
 
-    /// Doble clic sobre una anotación: cambia su número si es un contador, o su texto si lo es.
+    /// Doble clic sobre una anotación de texto entra a reescribirla. Un contador no necesita
+    /// nada: basta con tenerlo seleccionado y teclear el número.
     private func beginEditing(_ annotation: Annotation) {
-        if annotation.counterNumber != nil {
-            beginCounterEditing(annotation)
-        } else if annotation.textContent != nil {
-            beginTextEditing(editing: annotation)
-        }
+        guard annotation.textContent != nil else { return }
+        beginTextEditing(editing: annotation)
     }
-
-    /// Campo para renumerar un contador. Permite poner cualquier número, no sólo el siguiente
-    /// de la serie: si hay 1, 2 y 3, el cuarto puede ser el 8.
-    func beginCounterEditing(_ annotation: Annotation, initialText: String? = nil) {
-        commitCounterEditor()
-        commitTextEditor()
-
-        guard let number = annotation.counterNumber else { return }
-        let radius = AnnotationRenderer.counterRadius(for: annotation.style) * displayScale
-        let centerInView = viewPoint(from: annotation.center)
-        let width = max(radius * 2.2, 46)
-        let height = max(radius * 1.3, 22)
-
-        let field = NSTextField(frame: CGRect(x: centerInView.x - width / 2,
-                                              y: centerInView.y - height / 2,
-                                              width: width,
-                                              height: height))
-        field.stringValue = initialText ?? "\(number)"
-        field.alignment = .center
-        field.font = .systemFont(ofSize: min(max(radius * 0.9, 11), 28), weight: .bold)
-        field.isBordered = true
-        field.bezelStyle = .roundedBezel
-        field.focusRingType = .default
-        field.delegate = self
-        field.formatter = CounterNumberFormatter()
-
-        addSubview(field)
-        window?.makeFirstResponder(field)
-        if initialText == nil {
-            field.currentEditor()?.selectAll(nil)
-        } else {
-            // Se ha empezado a teclear: el cursor va al final para seguir escribiendo dígitos.
-            field.currentEditor()?.moveToEndOfLine(nil)
-        }
-
-        counterEditor = field
-        counterEditorAnnotationID = annotation.id
-    }
-
-    @discardableResult
-    func commitCounterEditor() -> Bool {
-        guard let field = counterEditor, let id = counterEditorAnnotationID else { return false }
-        let value = Int(field.stringValue.trimmingCharacters(in: .whitespaces))
-        counterEditor = nil
-        counterEditorAnnotationID = nil
-        field.removeFromSuperview()
-        window?.makeFirstResponder(self)
-
-        if let value {
-            document.setCounterNumber(value, for: id)
-        }
-        needsDisplay = true
-        return true
-    }
-
-    func cancelCounterEditor() {
-        guard let field = counterEditor else { return }
-        counterEditor = nil
-        counterEditorAnnotationID = nil
-        field.removeFromSuperview()
-        window?.makeFirstResponder(self)
-        needsDisplay = true
-    }
-
-    var isEditingCounter: Bool { counterEditor != nil }
 
     // MARK: - Texto en línea
 
@@ -604,7 +534,6 @@ final class CanvasView: NSView {
     private func beginTextEditing(editing annotation: Annotation) {
         guard case let .text(origin, string) = annotation.shape else { return }
         commitTextEditor()
-        commitCounterEditor()
         beginTextEditing(at: origin, style: annotation.style, existing: string, annotationID: annotation.id)
     }
 
@@ -718,51 +647,6 @@ final class CanvasView: NSView {
         case 126: return CGSize(width: 0, height: step)  // ↑
         default: return nil
         }
-    }
-}
-
-// MARK: - Campo del número de un contador
-
-extension CanvasView: NSTextFieldDelegate {
-    func controlTextDidEndEditing(_ notification: Notification) {
-        guard (notification.object as? NSTextField) === counterEditor else { return }
-        commitCounterEditor()
-    }
-
-    func control(_ control: NSControl, textView: NSTextView, doCommandBy selector: Selector) -> Bool {
-        guard control === counterEditor else { return false }
-        switch selector {
-        case #selector(NSResponder.insertNewline(_:)):
-            commitCounterEditor()
-            return true
-        case #selector(NSResponder.cancelOperation(_:)):
-            cancelCounterEditor()
-            return true
-        default:
-            return false
-        }
-    }
-}
-
-/// Sólo admite números enteros no negativos, para que un contador no acabe con texto suelto.
-private final class CounterNumberFormatter: NumberFormatter, @unchecked Sendable {
-    override init() {
-        super.init()
-        numberStyle = .none
-        allowsFloats = false
-        minimum = 0
-        maximum = 9999
-    }
-
-    @available(*, unavailable)
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) no está soportado")
-    }
-
-    override func isPartialStringValid(_ partialString: String,
-                                       newEditingString newString: AutoreleasingUnsafeMutablePointer<NSString?>?,
-                                       errorDescription error: AutoreleasingUnsafeMutablePointer<NSString?>?) -> Bool {
-        partialString.isEmpty || partialString.allSatisfy(\.isNumber)
     }
 }
 

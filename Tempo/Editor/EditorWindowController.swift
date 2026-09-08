@@ -19,6 +19,8 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSMenu
 
     private let canvas: CanvasView
     private var keyMonitor: Any?
+    /// Renumeración de contadores tecleando, sin cuadros ni confirmación.
+    private lazy var counterEntry = CounterQuickEntry(document: editorDocument)
 
     init(sessionID: UUID, document: EditorDocument) {
         self.sessionID = sessionID
@@ -124,8 +126,8 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSMenu
 
     /// Confirma cualquier texto o número a medio escribir antes de exportar.
     func flushPendingEdits() {
+        counterEntry.finish()
         canvas.commitTextEditor()
-        canvas.commitCounterEditor()
         // La selección no debe salir dibujada en la imagen final.
         editorDocument.select(nil)
     }
@@ -141,8 +143,8 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSMenu
     }
 
     @IBAction func undoEdit(_ sender: Any?) {
+        counterEntry.finish()
         canvas.commitTextEditor()
-        canvas.commitCounterEditor()
         editorDocument.undo()
     }
 
@@ -174,8 +176,8 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSMenu
         editorDelegate?.editorRequestedDiscard(self)
     }
 
-    /// `true` mientras el usuario escribe una anotación de texto o el número de un contador.
-    var isEditingText: Bool { canvas.isEditingText || canvas.isEditingCounter }
+    /// `true` mientras el usuario escribe una anotación de texto.
+    var isEditingText: Bool { canvas.isEditingText }
 
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
         switch menuItem.action {
@@ -205,8 +207,8 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSMenu
 
         // Esc va deshaciendo estados, del más concreto al más general.
         if event.keyCode == 53 {
-            if canvas.isEditingCounter {
-                canvas.cancelCounterEditor()
+            if counterEntry.isTyping {
+                counterEntry.finish()
             } else if canvas.isEditingText {
                 canvas.cancelTextEditor()
             } else if editorDocument.selectedAnnotation != nil {
@@ -217,8 +219,8 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSMenu
             return true
         }
 
-        // Mientras se escribe un texto o un número, las teclas pertenecen a ese campo.
-        guard !canvas.isEditingText, !canvas.isEditingCounter else { return false }
+        // Mientras se escribe un texto, las teclas pertenecen a ese campo.
+        guard !canvas.isEditingText else { return false }
         guard modifiers.isEmpty || modifiers == .shift else { return false }
         guard let characters = event.charactersIgnoringModifiers?.lowercased(), !characters.isEmpty else { return false }
 
@@ -227,13 +229,16 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSMenu
             return true
         }
 
-        // Con un contador seleccionado, teclear un número edita su número. Es lo que se espera
-        // al escribir sobre algo que muestra una cifra, y prevalece sobre el atajo de color.
-        if let selected = editorDocument.selectedAnnotation,
-           selected.counterNumber != nil,
-           let digit = characters.first,
-           digit.isNumber {
-            canvas.beginCounterEditing(selected, initialText: String(digit))
+        // Con un contador seleccionado, teclear un número lo cambia al instante. Es lo que se
+        // espera al escribir sobre algo que muestra una cifra, y prevalece sobre el atajo de
+        // color mientras ese contador siga elegido.
+        if let digit = characters.first, digit.isNumber, counterEntry.type(digit) {
+            return true
+        }
+
+        // Mientras se teclea un número, ⌫ corrige el último dígito en lugar de borrar el
+        // contador entero.
+        if event.keyCode == 51, counterEntry.deleteLastDigit() {
             return true
         }
 
