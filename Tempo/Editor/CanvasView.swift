@@ -313,7 +313,8 @@ final class CanvasView: NSView {
         case .counter:
             let annotation = Annotation(shape: .counter(center: point, number: document.nextCounterNumber),
                                         style: document.currentStyle)
-            document.add(annotation)
+            document.place(annotation, keepingTool: keepsTool(event))
+            refreshCursor()
         case .text:
             beginTextEditing(at: point)
         case .arrow, .rectangle, .ellipse, .blur, .pencil:
@@ -448,8 +449,14 @@ final class CanvasView: NSView {
         }
         guard isDrawing, let draft = document.draft else { return }
         document.draft = nil
-        document.add(draft)
+        document.place(draft, keepingTool: keepsTool(event))
+        refreshCursor()
         needsDisplay = true
+    }
+
+    /// Manteniendo ⌥ al soltar, la herramienta sigue activa en lugar de volver al puntero.
+    private func keepsTool(_ event: NSEvent?) -> Bool {
+        event?.modifierFlags.contains(.option) ?? false
     }
 
     private func makeDraft(from: CGPoint, to: CGPoint, points: [CGPoint]) -> Annotation {
@@ -526,7 +533,7 @@ final class CanvasView: NSView {
 
     /// Campo para renumerar un contador. Permite poner cualquier número, no sólo el siguiente
     /// de la serie: si hay 1, 2 y 3, el cuarto puede ser el 8.
-    private func beginCounterEditing(_ annotation: Annotation) {
+    func beginCounterEditing(_ annotation: Annotation, initialText: String? = nil) {
         commitCounterEditor()
         commitTextEditor()
 
@@ -540,7 +547,7 @@ final class CanvasView: NSView {
                                               y: centerInView.y - height / 2,
                                               width: width,
                                               height: height))
-        field.stringValue = "\(number)"
+        field.stringValue = initialText ?? "\(number)"
         field.alignment = .center
         field.font = .systemFont(ofSize: min(max(radius * 0.9, 11), 28), weight: .bold)
         field.isBordered = true
@@ -551,7 +558,12 @@ final class CanvasView: NSView {
 
         addSubview(field)
         window?.makeFirstResponder(field)
-        field.currentEditor()?.selectAll(nil)
+        if initialText == nil {
+            field.currentEditor()?.selectAll(nil)
+        } else {
+            // Se ha empezado a teclear: el cursor va al final para seguir escribiendo dígitos.
+            field.currentEditor()?.moveToEndOfLine(nil)
+        }
 
         counterEditor = field
         counterEditorAnnotationID = annotation.id
@@ -656,7 +668,8 @@ final class CanvasView: NSView {
         }
 
         guard !trimmed.isEmpty else { return false }
-        document.add(Annotation(shape: .text(origin: origin, string: string), style: document.currentStyle))
+        document.place(Annotation(shape: .text(origin: origin, string: string), style: document.currentStyle))
+        refreshCursor()
         needsDisplay = true
         return true
     }

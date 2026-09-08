@@ -320,6 +320,55 @@ final class EditingTests: XCTestCase {
         XCTAssertNil(document.selectedID, "No puede quedar seleccionado algo que ya no existe")
     }
 
+    // MARK: - Volver al puntero tras colocar algo
+
+    func testPlacingAnAnnotationReturnsToThePointer() {
+        let document = makeDocument()
+        document.tool = .annotate(.rectangle)
+
+        document.place(Annotation(shape: .rectangle(rect), style: .default))
+
+        XCTAssertEqual(document.tool, .navigate,
+                       "Tras dibujar algo lo normal es querer ajustarlo, no dibujar otro igual")
+        XCTAssertNotNil(document.selectedAnnotation, "Y queda seleccionado para poder moverlo")
+    }
+
+    func testHoldingOptionKeepsTheTool() {
+        let document = makeDocument()
+        document.tool = .annotate(.counter)
+
+        document.place(Annotation(shape: .counter(center: CGPoint(x: 20, y: 20), number: 1), style: .default),
+                       keepingTool: true)
+
+        XCTAssertEqual(document.tool, .annotate(.counter),
+                       "Con ⌥ la herramienta sigue activa, para encadenar varios seguidos")
+    }
+
+    func testDiscardedGestureDoesNotChangeTheTool() {
+        let document = makeDocument()
+        document.tool = .annotate(.rectangle)
+
+        // Un clic sin arrastre no crea nada, así que tampoco debe cambiar de herramienta.
+        let placed = document.place(Annotation(shape: .rectangle(CGRect(x: 5, y: 5, width: 0, height: 0)),
+                                               style: .default))
+
+        XCTAssertFalse(placed)
+        XCTAssertEqual(document.tool, .annotate(.rectangle))
+    }
+
+    func testPlacingSeveralCountersKeepsNumbering() {
+        let document = makeDocument()
+        for expected in 1...4 {
+            document.tool = .annotate(.counter)
+            let counter = Annotation(shape: .counter(center: CGPoint(x: 20 * expected, y: 20),
+                                                     number: document.nextCounterNumber),
+                                     style: .default)
+            XCTAssertEqual(counter.counterNumber, expected)
+            document.place(counter)
+            XCTAssertEqual(document.tool, .navigate)
+        }
+    }
+
     // MARK: - La selección no sale en la imagen
 
     func testSelectionDoesNotAffectExportedImage() throws {

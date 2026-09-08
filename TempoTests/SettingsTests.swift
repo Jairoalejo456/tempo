@@ -108,6 +108,15 @@ final class SettingsTests: XCTestCase {
         XCTAssertFalse(preferences.saveFolderExists, "Si la carpeta desapareció, los ajustes lo advierten")
     }
 
+    // MARK: - Identidad de la aplicación
+
+    func testAppNameIsUsedForWindowTitles() {
+        // El título de la ventana del editor sale de aquí, para que se reconozca la aplicación.
+        XCTAssertEqual(Preferences.appName, "Tempo")
+        XCTAssertFalse(Preferences.appVersion.isEmpty)
+        XCTAssertFalse(Preferences.buildNumber.isEmpty)
+    }
+
     // MARK: - Presencia en el sistema
 
     func testDockIconIsOffByDefault() throws {

@@ -93,7 +93,6 @@ private final class SelectionOverlayWindow: NSWindow {
         hasShadow = false
         level = .screenSaver
         ignoresMouseEvents = false
-        acceptsMouseMovedEvents = true
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
         setFrame(screen.frame, display: true)
 
@@ -126,8 +125,6 @@ private final class SelectionOverlayView: NSView {
 
     private var anchor: CGPoint?
     private var current: CGPoint?
-    private var pointerLocation: CGPoint = .zero
-    private var trackingArea: NSTrackingArea?
 
     private var selectionRect: CGRect? {
         guard let anchor, let current else { return nil }
@@ -150,19 +147,6 @@ private final class SelectionOverlayView: NSView {
         NSCursor.crosshair.set()
     }
 
-    /// Se sigue el ratón con un área de seguimiento activa siempre: las ventanas que no son
-    /// la principal no reciben `mouseMoved`, y sin esto la cruz no aparecería en el resto
-    /// de monitores.
-    override func updateTrackingAreas() {
-        super.updateTrackingAreas()
-        if let trackingArea { removeTrackingArea(trackingArea) }
-        let area = NSTrackingArea(rect: bounds,
-                                  options: [.mouseMoved, .activeAlways, .inVisibleRect],
-                                  owner: self)
-        addTrackingArea(area)
-        trackingArea = area
-    }
-
     // MARK: Eventos
 
     override func mouseDown(with event: NSEvent) {
@@ -176,12 +160,6 @@ private final class SelectionOverlayView: NSView {
 
     override func mouseDragged(with event: NSEvent) {
         current = convert(event.locationInWindow, from: nil)
-        pointerLocation = current ?? .zero
-        needsDisplay = true
-    }
-
-    override func mouseMoved(with event: NSEvent) {
-        pointerLocation = convert(event.locationInWindow, from: nil)
         needsDisplay = true
     }
 
@@ -230,20 +208,9 @@ private final class SelectionOverlayView: NSView {
             context.stroke(rect.insetBy(dx: 0.5, dy: 0.5))
 
             drawDimensions(for: rect, in: context)
-        } else {
-            drawCrosshair(in: context)
         }
-    }
-
-    private func drawCrosshair(in context: CGContext) {
-        context.setStrokeColor(NSColor.white.withAlphaComponent(0.55).cgColor)
-        context.setLineWidth(1)
-        context.beginPath()
-        context.move(to: CGPoint(x: pointerLocation.x + 0.5, y: bounds.minY))
-        context.addLine(to: CGPoint(x: pointerLocation.x + 0.5, y: bounds.maxY))
-        context.move(to: CGPoint(x: bounds.minX, y: pointerLocation.y + 0.5))
-        context.addLine(to: CGPoint(x: bounds.maxX, y: pointerLocation.y + 0.5))
-        context.strokePath()
+        // Antes de arrastrar no se dibuja nada más: la referencia es el propio cursor de cruz
+        // del sistema. Unas guías cruzando toda la pantalla resultaban invasivas.
     }
 
     private func drawDimensions(for rect: CGRect, in context: CGContext) {

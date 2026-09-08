@@ -82,6 +82,23 @@ final class EditorDocument: ObservableObject {
         selectedID = annotation.id
     }
 
+    /// Registra una anotación recién colocada con el ratón.
+    ///
+    /// Además de añadirla, devuelve la herramienta al puntero: lo normal tras dibujar algo es
+    /// querer ajustarlo, no dibujar otro igual. Con `keepingTool` se conserva la herramienta,
+    /// que es lo cómodo para encadenar varios contadores o varios trazos.
+    /// - Returns: `true` si la anotación llegó a añadirse.
+    @discardableResult
+    func place(_ annotation: Annotation, keepingTool: Bool = false) -> Bool {
+        let countBefore = annotations.count
+        add(annotation)
+        guard annotations.count > countBefore else { return false }
+        if !keepingTool {
+            tool = .navigate
+        }
+        return true
+    }
+
     // MARK: - Selección
 
     var selectedAnnotation: Annotation? {

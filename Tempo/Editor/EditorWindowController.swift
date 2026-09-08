@@ -31,7 +31,9 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSMenu
             backing: .buffered,
             defer: false
         )
-        window.title = "Captura"
+        // El título es el nombre de la aplicación, para que se reconozca de un vistazo en el
+        // conmutador de ventanas y en la barra de título.
+        window.title = Preferences.appName
         window.titlebarAppearsTransparent = false
         window.isReleasedWhenClosed = false
         window.minSize = NSSize(width: 880, height: 320)
@@ -222,6 +224,16 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSMenu
 
         if let tool = EditorTool.allCases.first(where: { $0.shortcutKey == characters }) {
             editorDocument.tool = tool
+            return true
+        }
+
+        // Con un contador seleccionado, teclear un número edita su número. Es lo que se espera
+        // al escribir sobre algo que muestra una cifra, y prevalece sobre el atajo de color.
+        if let selected = editorDocument.selectedAnnotation,
+           selected.counterNumber != nil,
+           let digit = characters.first,
+           digit.isNumber {
+            canvas.beginCounterEditing(selected, initialText: String(digit))
             return true
         }
 

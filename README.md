@@ -120,8 +120,9 @@ open -n /Applications/Tempo.app --args --self-check ~/Desktop/informe.txt
 Ambos se pueden cambiar en **Ajustes › Atajos** (⌘,): haz clic en el atajo y pulsa la
 combinación que quieras. Esc cancela y `⌫` restablece el original.
 
-Durante la selección de región: arrastra para definir la zona (se muestra el tamaño en píxeles),
-`Esc` o clic derecho para cancelar. Un clic sin arrastre también cancela.
+Durante la selección de región la pantalla se atenúa y el cursor pasa a ser una cruz: arrastra
+para definir la zona y verás su tamaño en píxeles. `Esc` o clic derecho cancelan, y un clic sin
+arrastre también.
 
 ### Editor
 
@@ -139,6 +140,8 @@ Durante la selección de región: arrastra para definir la zona (se muestra el t
 | Acción | Atajo |
 |---|---|
 | Mover lo seleccionado | flechas (`⇧` = 10 px) |
+| Renumerar el contador seleccionado | teclear el número |
+| Seguir con la misma herramienta | `⌥` al soltar |
 | Eliminar lo seleccionado | `⌫` |
 | Quitar la selección | `Esc` |
 | Acercar / Alejar | `⌘+` / `⌘−` |
@@ -146,7 +149,7 @@ Durante la selección de región: arrastra para definir la zona (se muestra el t
 | Tamaño real | `⌘1` |
 | Deshacer / Rehacer | `⌘Z` / `⇧⌘Z` |
 | Borrar la última anotación | `⌫` |
-| Elegir color | `1` … `8` |
+| Elegir color | `1` … `8` (salvo con un contador seleccionado) |
 | Grosor y tamaño de texto | `[` / `]` |
 | Copiar con anotaciones | `⌘C` |
 | Guardar como PNG | `⌘S` |
@@ -207,10 +210,15 @@ cualquiera de ellas:
 **Doble clic** entra a editar el contenido: el texto de una anotación de texto, o el número de
 un contador.
 
+Al terminar de colocar cualquier elemento, la herramienta vuelve sola al puntero y el elemento
+queda seleccionado, listo para ajustarlo. Si prefieres encadenar varios seguidos —varios
+contadores, varios trazos— mantén **⌥** al soltar el ratón y la herramienta sigue activa.
+
 ### Contadores con el número que quieras
 
-Los contadores se numeran solos al ponerlos, pero no estás atado a ese orden. Selecciona uno y
-cámbialo desde el control **N.º** de la barra, o haz doble clic sobre él y escribe el número.
+Los contadores se numeran solos al ponerlos, pero no estás atado a ese orden. Con uno
+seleccionado tienes tres formas de cambiarlo: **teclear el número** directamente, el control
+**N.º** de la barra, o **doble clic** sobre él.
 Si tienes el 1, 2 y 3 y quieres que el siguiente sea el 8, lo pones y ya está; a partir de ahí
 la numeración automática continúa desde el mayor que exista.
 
