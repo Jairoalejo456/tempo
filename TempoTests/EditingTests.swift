@@ -300,6 +300,85 @@ final class EditingTests: XCTestCase {
         XCTAssertEqual(document.annotations.first?.style.color, .red, "El cambio de color se deshace")
     }
 
+    func testChangingColorAffectsSelectedText() {
+        let document = makeDocument()
+        document.color = .red
+        document.add(Annotation(shape: .text(origin: CGPoint(x: 10, y: 10), string: "Hola"),
+                                style: document.currentStyle))
+        XCTAssertEqual(document.annotations.first?.style.color, .red)
+
+        document.color = .white
+        document.applyColorToSelection()
+        XCTAssertEqual(document.annotations.first?.style.color, .white,
+                       "Un texto ya escrito cambia de color como cualquier otra anotación")
+    }
+
+    // MARK: - La barra refleja lo seleccionado
+
+    func testSelectingAnAnnotationAdoptsItsStyle() {
+        let document = makeDocument()
+        document.color = .red
+        document.lineWidth = 4
+        document.fontSize = 28
+        let blue = Annotation(shape: .text(origin: .zero, string: "Hola"),
+                              style: AnnotationStyle(color: .blue, lineWidth: 7, fontSize: 40))
+        document.add(blue)
+
+        // La barra debe mostrar el estilo del texto elegido, no el que hubiera antes.
+        XCTAssertEqual(document.color, .blue)
+        XCTAssertEqual(document.lineWidth, 7)
+        XCTAssertEqual(document.fontSize, 40)
+    }
+
+    func testSelectingDoesNotTouchTheHistory() {
+        let document = makeDocument()
+        let first = Annotation(shape: .text(origin: .zero, string: "A"),
+                               style: AnnotationStyle(color: .blue, lineWidth: 7, fontSize: 40))
+        document.add(first)
+        let second = addRectangle(to: document)
+
+        document.select(first.id)
+        document.select(second.id)
+
+        document.undo()
+        XCTAssertEqual(document.annotations.count, 1,
+                       "Cambiar de selección no deja entradas en el historial")
+    }
+
+    func testSelectingABlurAdoptsItsIntensity() {
+        let document = makeDocument()
+        document.blurIntensity = 0.2
+        let strong = Annotation(shape: .blur(rect),
+                                style: AnnotationStyle(color: .red, lineWidth: 4, fontSize: 28,
+                                                       blurIntensity: 0.95))
+        document.add(strong)
+        XCTAssertEqual(document.blurIntensity, 0.95)
+    }
+
+    func testSelectingABlurDoesNotStealTheActiveColor() {
+        let document = makeDocument()
+        document.color = .green
+        document.add(Annotation(shape: .blur(rect), style: .default))
+        XCTAssertEqual(document.color, .green,
+                       "El blur no pinta con color, así que no debe cambiar el color activo")
+    }
+
+    func testWholeTextChangesColourNotJustPartOfIt() {
+        let document = makeDocument()
+        document.color = .red
+        let text = Annotation(shape: .text(origin: CGPoint(x: 10, y: 10), string: "Texto largo"),
+                              style: document.currentStyle)
+        document.add(text)
+
+        document.color = .white
+        document.applyColorToSelection()
+
+        // El color vive en el estilo de la anotación, así que se aplica al texto entero: no hay
+        // forma de que una parte quede de otro color.
+        XCTAssertEqual(document.annotations.first?.style.color, .white)
+        XCTAssertEqual(document.annotations.first?.textContent, "Texto largo")
+    }
+
     func testBlurIgnoresColourChanges() {
         let document = makeDocument()
         let blur = Annotation(shape: .blur(rect), style: .default)

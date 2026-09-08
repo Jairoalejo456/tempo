@@ -84,7 +84,7 @@ final class EditorDocument: ObservableObject {
     func add(_ annotation: Annotation) {
         guard annotation.isMeaningful else { return }
         perform { $0.append(annotation) }
-        selectedID = annotation.id
+        select(annotation.id)
     }
 
     /// Registra una anotación recién colocada con el ratón.
@@ -114,6 +114,23 @@ final class EditorDocument: ObservableObject {
     func select(_ id: UUID?) {
         guard selectedID != id else { return }
         selectedID = id
+        adoptStyleOfSelection()
+    }
+
+    /// Al elegir una anotación, los controles de la barra pasan a mostrar **sus** propiedades.
+    ///
+    /// Sin esto la barra mentía: podía marcar rojo mientras había seleccionado un texto azul, y
+    /// entonces cambiar el tamaño le aplicaba de paso un color que el usuario no había pedido.
+    private func adoptStyleOfSelection() {
+        guard let annotation = selectedAnnotation else { return }
+        if annotation.tool.usesColor {
+            color = annotation.style.color
+        }
+        lineWidth = annotation.style.lineWidth
+        fontSize = annotation.style.fontSize
+        if annotation.tool == .blur {
+            blurIntensity = annotation.style.blurIntensity
+        }
     }
 
     /// Anotación bajo un punto, empezando por la de encima.

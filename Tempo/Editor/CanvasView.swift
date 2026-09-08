@@ -48,6 +48,15 @@ final class CanvasView: NSView {
             .receive(on: RunLoop.main)
             .sink { [weak self] _ in self?.needsDisplay = true }
             .store(in: &cancellables)
+
+        // Mientras se escribe una anotación de texto, cambiar el color o el tamaño debe verse
+        // en el acto y sobre **todo** lo escrito, no sólo sobre lo que se teclee a partir de ahí.
+        document.$color
+            .map { _ in () }
+            .merge(with: document.$fontSize.map { _ in () })
+            .receive(on: RunLoop.main)
+            .sink { [weak self] in self?.restyleOpenTextEditor() }
+            .store(in: &cancellables)
     }
 
     @available(*, unavailable)
@@ -571,6 +580,29 @@ final class CanvasView: NSView {
     }
 
     /// Confirma el texto en edición convirtiéndolo en anotación.
+    /// Aplica el estilo activo al campo de texto abierto, si lo hay.
+    private func restyleOpenTextEditor() {
+        guard let editor = textEditor else { return }
+        let style = document.currentStyle
+        let color = NSColor(cgColor: style.color.cgColor) ?? .systemRed
+        let font = NSFont.systemFont(ofSize: style.fontSize * displayScale, weight: .semibold)
+
+        editor.configure(font: font, color: color)
+        // `configure` fija los atributos de lo que se escriba a partir de ahora; esto repinta
+        // lo que ya estaba escrito.
+        let whole = NSRange(location: 0, length: (editor.string as NSString).length)
+        if whole.length > 0 {
+            editor.textStorage?.addAttributes([.foregroundColor: color, .font: font], range: whole)
+        }
+
+        // El cuerpo de letra puede haber cambiado: el campo se reajusta para seguir cuadrando
+        // con el texto que se va a dibujar.
+        var frame = editor.frame
+        frame.size.height = ceil(font.ascender - font.descender + font.leading)
+        editor.frame = frame
+        needsDisplay = true
+    }
+
     @discardableResult
     func commitTextEditor() -> Bool {
         guard let editor = textEditor, let origin = textEditorOrigin else { return false }
@@ -590,7 +622,12 @@ final class CanvasView: NSView {
                 document.select(annotationID)
                 document.deleteSelected()
             } else {
-                document.replace(existing.withText(string))
+                // Se conserva el estilo activo, que al entrar a reeditar adoptó el de esta
+                // anotación: así los cambios de color o tamaño hechos mientras se escribía
+                // quedan aplicados, y si no se tocó nada, todo sigue igual.
+                var updated = existing.withText(string)
+                updated.style = document.currentStyle
+                document.replace(updated)
             }
             needsDisplay = true
             return true

@@ -205,7 +205,11 @@ cualquiera de ellas:
 - **Tirador circular superior** para girarla; con `⇧` salta de 15 en 15 grados.
 - Una **flecha** se reorienta moviendo sus extremos, que es más directo que girarla.
 - **`⌫`** para eliminarla, o el botón de papelera de la barra.
-- Cambiar de **color o grosor** con algo seleccionado lo aplica a esa anotación.
+- Cambiar de **color o grosor** con algo seleccionado lo aplica a esa anotación, entera.
+
+Al seleccionar algo, la barra pasa a mostrar **sus** propiedades: si eliges un texto azul, la
+paleta marca azul. Así el siguiente ajuste que toques no le cambia de paso algo que no querías,
+y lo que dibujes después continúa con ese estilo.
 
 **Doble clic** sobre un texto entra a reescribirlo.
 
@@ -232,8 +236,9 @@ seleccionada— es un blur o un trazo a lápiz, así que la barra no crece por t
 
 - **Flecha**, **rectángulo** y **elipse** con color y tres tamaños.
 - **Lápiz** con color y un **deslizador de grosor** continuo, de 1 a 24 puntos.
-- **Texto**: se escribe en el sitio, con el color y el tamaño activos. `↩` confirma, `⌥↩`
-  añade una línea, `Esc` cancela.
+- **Texto**: se escribe en el sitio, con el color y el tamaño activos. Cambiarlos mientras
+  escribes repinta **todo** lo escrito, no sólo lo que teclees a partir de ahí. `↩` confirma,
+  `⌥↩` añade una línea, `Esc` cancela.
 - **Blur**: difumina la región seleccionada para censurar datos sensibles. Su **intensidad** se
   ajusta con el deslizador de la barra, que aparece al elegir la herramienta o al seleccionar
   un blur ya puesto.
