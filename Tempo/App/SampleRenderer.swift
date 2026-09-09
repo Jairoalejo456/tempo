@@ -89,9 +89,13 @@ enum SampleRenderer {
     }
 
     /// Lienzo que imita una ventana cualquiera, para ver las anotaciones sobre contenido real.
-    static func makeSyntheticCapture(scale: CGFloat = 2) -> CaptureImage {
-        let width: CGFloat = 720
-        let height: CGFloat = 460
+    /// - Parameter variant: genera lienzos de distinta forma y tono, para que una pila de
+    ///   ejemplo se parezca a un conjunto real de capturas y no a la misma repetida.
+    static func makeSyntheticCapture(scale: CGFloat = 2, variant: Int = 0) -> CaptureImage {
+        let shapes: [(CGFloat, CGFloat)] = [(720, 460), (640, 380), (760, 300), (560, 520)]
+        let shape = shapes[variant % shapes.count]
+        let width: CGFloat = shape.0
+        let height: CGFloat = shape.1
         let context = CGContext(data: nil,
                                 width: Int(width * scale),
                                 height: Int(height * scale),
@@ -138,37 +142,53 @@ enum SampleRenderer {
         return CaptureImage(cgImage: context.makeImage()!, scale: scale)
     }
 
-    static func addSampleAnnotations(to document: EditorDocument) {
-        document.color = .red
-        document.add(Annotation(shape: .rectangle(CGRect(x: 200, y: 300, width: 300, height: 60)),
-                                style: document.currentStyle))
+    static func addSampleAnnotations(to document: EditorDocument, variant: Int = 0) {
+        // Todas las posiciones son relativas al tamaño de la captura: la muestra se usa con
+        // lienzos de formas distintas y con coordenadas fijas las anotaciones se salían.
+        let size = document.capture.logicalSize
+        func point(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
+            CGPoint(x: size.width * x, y: size.height * y)
+        }
+        func rect(_ x: CGFloat, _ y: CGFloat, _ width: CGFloat, _ height: CGFloat) -> CGRect {
+            CGRect(x: size.width * x, y: size.height * y,
+                   width: size.width * width, height: size.height * height)
+        }
 
-        document.add(Annotation(shape: .arrow(from: CGPoint(x: 560, y: 220), to: CGPoint(x: 430, y: 300)),
+        // Cada captura de la pila lleva un color distinto, para distinguirlas de un vistazo.
+        let colors: [AnnotationColor] = [.red, .blue, .green, .purple]
+        document.color = colors[variant % colors.count]
+        document.add(Annotation(shape: .rectangle(rect(0.28, 0.63, 0.42, 0.13)),
+                                style: document.currentStyle))
+        document.add(Annotation(shape: .arrow(from: point(0.78, 0.46), to: point(0.60, 0.62)),
                                 style: document.currentStyle))
 
         document.color = .blue
-        document.add(Annotation(shape: .ellipse(CGRect(x: 20, y: 330, width: 150, height: 60)),
+        document.add(Annotation(shape: .ellipse(rect(0.03, 0.70, 0.21, 0.13)),
                                 style: document.currentStyle))
 
         document.color = .green
         document.add(Annotation(shape: .pencil(points: (0..<40).map {
-            CGPoint(x: 220 + Double($0) * 8, y: 180 + sin(Double($0) / 4) * 18)
+            point(0.30 + CGFloat($0) * 0.011, 0.38 + sin(Double($0) / 4) * 0.04)
         }), style: document.currentStyle))
 
         document.color = .purple
-        document.add(Annotation(shape: .text(origin: CGPoint(x: 210, y: 370),
-                                             string: "Revisar este bloque antes de enviarlo"),
+        document.fontSize = max(18, size.height * 0.06)
+        document.textWidth = size.width * 0.42
+        document.add(Annotation(shape: .text(origin: point(0.30, 0.80),
+                                             string: "Revisar este bloque"),
                                 style: document.currentStyle))
+        document.fontSize = 28
 
-        // Censura del dato sensible.
-        document.add(Annotation(shape: .blur(CGRect(x: 205, y: 55, width: 270, height: 50)),
+        // Censura de un dato sensible.
+        document.add(Annotation(shape: .blur(rect(0.28, 0.11, 0.38, 0.10)),
                                 style: document.currentStyle))
 
         // Contadores numerados automáticamente.
         document.color = .orange
-        for point in [CGPoint(x: 60, y: 250), CGPoint(x: 530, y: 330), CGPoint(x: 640, y: 130)] {
-            document.add(Annotation(shape: .counter(center: point, number: document.nextCounterNumber),
+        for position in [point(0.08, 0.54), point(0.74, 0.72), point(0.89, 0.28)] {
+            document.add(Annotation(shape: .counter(center: position, number: document.nextCounterNumber),
                                     style: document.currentStyle))
         }
+        document.select(nil)
     }
 }

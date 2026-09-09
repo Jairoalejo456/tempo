@@ -47,6 +47,50 @@ enum ImageExporter {
         try compose(capture: document.capture, annotations: document.annotations)
     }
 
+    // MARK: - Unir varias capturas
+
+    /// Separación entre capturas al unirlas en una sola imagen.
+    static let combinedSpacing = 24
+
+    /// Une varias imágenes en una sola, apiladas verticalmente y centradas.
+    ///
+    /// Las capturas rara vez tienen el mismo ancho, así que la imagen resultante toma el ancho
+    /// de la más ancha y el resto se centran, con una franja de separación entre ellas para que
+    /// se distinga dónde acaba una y empieza la siguiente.
+    static func combineVertically(_ images: [CGImage],
+                                  background: CGColor = CGColor(gray: 0.12, alpha: 1)) throws -> CGImage {
+        guard !images.isEmpty else { throw ExportError.imageCreationFailed }
+        guard images.count > 1 else { return images[0] }
+
+        let width = images.map(\.width).max() ?? 0
+        let height = images.reduce(0) { $0 + $1.height } + combinedSpacing * (images.count - 1)
+        guard width > 0, height > 0 else { throw ExportError.contextCreationFailed }
+
+        let colorSpace = CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB()
+        guard let context = CGContext(data: nil, width: width, height: height,
+                                      bitsPerComponent: 8, bytesPerRow: 0, space: colorSpace,
+                                      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else {
+            throw ExportError.contextCreationFailed
+        }
+
+        context.setFillColor(background)
+        context.fill(CGRect(x: 0, y: 0, width: width, height: height))
+        context.interpolationQuality = .high
+
+        // Se dibujan de arriba abajo en el orden en que se capturaron; el contexto tiene el
+        // origen abajo, así que se recorre restando.
+        var top = height
+        for image in images {
+            let x = (width - image.width) / 2
+            top -= image.height
+            context.draw(image, in: CGRect(x: x, y: top, width: image.width, height: image.height))
+            top -= combinedSpacing
+        }
+
+        guard let combined = context.makeImage() else { throw ExportError.imageCreationFailed }
+        return combined
+    }
+
     // MARK: - Reducir
 
     /// Reduce la imagen para que su lado mayor no pase de `maximumSide`.

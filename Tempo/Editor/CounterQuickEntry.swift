@@ -14,14 +14,18 @@ final class CounterQuickEntry {
     private let groupingInterval: TimeInterval = 1.2
     private let maximumDigits = 4
 
-    private weak var document: EditorDocument?
+    /// La pila, para que el tecleo se aplique siempre a la captura activa aunque el usuario
+    /// cambie de una a otra mientras escribe.
+    private weak var stack: EditorStack?
     private var buffer: String = ""
     private var targetID: UUID?
     private var timer: Timer?
 
-    init(document: EditorDocument) {
-        self.document = document
+    init(stack: EditorStack) {
+        self.stack = stack
     }
+
+    private var document: EditorDocument? { stack?.active }
 
     deinit {
         timer?.invalidate()

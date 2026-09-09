@@ -8,6 +8,10 @@ final class AppCoordinator: NSObject {
     static let shared = AppCoordinator()
 
     private var sessions: [CaptureSession] = []
+
+    /// Ventana de edición, compartida por todas las capturas abiertas: editar varias a la vez
+    /// es una sola ventana con la pila dentro, no una ventana por captura.
+    private var editor: EditorWindowController?
     private let regionSelection = RegionSelectionController()
     private var isCapturing = false
 
@@ -56,6 +60,20 @@ final class AppCoordinator: NSObject {
                 }
             }
         }
+    }
+
+    /// Abre varias capturas de ejemplo apiladas, para probar la edición múltiple.
+    @MainActor
+    func presentDemoStack(count: Int, openingEditor: Bool) {
+        for index in 0..<max(count, 1) {
+            let capture = SampleRenderer.makeSyntheticCapture(variant: index)
+            present(capture: capture, on: NSScreen.main)
+            if let session = sessions.last {
+                SampleRenderer.addSampleAnnotations(to: session.document, variant: index)
+            }
+        }
+        guard openingEditor, let first = sessions.first else { return }
+        openEditor(for: first)
     }
 
     /// Abre una captura de ejemplo para poder probar el editor sin necesidad del permiso de
@@ -122,8 +140,12 @@ final class AppCoordinator: NSObject {
             controller.delegate = self
             session.thumbnail = controller
         }
+        refreshThumbnailCounters()
         restackThumbnails()
-        controller.show()
+        // Sólo se muestra si le toca estar al frente del mazo.
+        if sessions.last(where: { !$0.isBeingEdited })?.id == session.id {
+            controller.show()
+        }
     }
 
     /// Vista previa de la miniatura: la captura con las anotaciones ya aplicadas.
@@ -136,42 +158,76 @@ final class AppCoordinator: NSObject {
         return NSImage(cgImage: capture.cgImage, size: capture.logicalSize)
     }
 
-    /// Reordena las miniaturas visibles apilándolas desde la esquina inferior derecha.
-    private func restackThumbnails() {
-        var indexByScreen: [ObjectIdentifier: Int] = [:]
-        for session in sessions {
-            guard let thumbnail = session.thumbnail, !session.isEditorVisible else { continue }
-            let screen = session.screen ?? NSScreen.main
-            guard let screen else { continue }
-            let key = ObjectIdentifier(screen)
-            let index = indexByScreen[key, default: 0]
-            thumbnail.position(on: screen, stackIndex: index)
-            indexByScreen[key] = index + 1
+    /// Cada miniatura muestra cuántas capturas hay en total, para que el mazo tenga sentido.
+    private func refreshThumbnailCounters() {
+        let waiting = sessions.filter { !$0.isBeingEdited }
+        for session in waiting {
+            session.thumbnail?.updateStack(total: waiting.count)
         }
+    }
+
+    /// Coloca el mazo de miniaturas en la esquina inferior derecha.
+    ///
+    /// Aunque cada captura tiene su propia ventana de miniatura, sólo se muestra la de encima:
+    /// las demás quedan representadas por las hojas que asoman por detrás y por el contador.
+    /// Es lo que hace que varias capturas ocupen una esquina y no toda la pantalla.
+    private func restackThumbnails() {
+        let waiting = sessions.filter { !$0.isBeingEdited }
+        guard let front = waiting.last, let screen = front.screen ?? NSScreen.main else {
+            for session in sessions { session.thumbnail?.hide() }
+            return
+        }
+
+        for session in waiting where session.id != front.id {
+            session.thumbnail?.hide()
+        }
+        front.thumbnail?.position(on: screen, stackIndex: 0)
+        front.thumbnail?.updateStack(total: waiting.count)
     }
 
     // MARK: - Editor
 
     @MainActor
     private func openEditor(for session: CaptureSession) {
-        session.thumbnail?.hide()
+        // Se abren todas las capturas vivas en una sola ventana, saltando a la que se pulsó.
+        let documents = sessions.map(\.document)
+        guard !documents.isEmpty else { return }
 
-        let controller: EditorWindowController
-        if let existing = session.editor {
-            controller = existing
-        } else {
-            controller = EditorWindowController(sessionID: session.id, document: session.document)
-            controller.editorDelegate = self
-            session.editor = controller
+        for other in sessions {
+            other.isBeingEdited = true
+            other.thumbnail?.hide()
         }
-        controller.present()
+
+        if let editor, editor.window?.isVisible == true {
+            // Ya había una ventana abierta: se le añade lo que falte y se salta a la pulsada.
+            for document in documents { editor.stack.add(document) }
+            editor.refreshAfterExternalChange()
+            editor.focus(on: session.document.id)
+            editor.present()
+        } else {
+            let stack = EditorStack(documents: documents, activeID: session.document.id)
+            let controller = EditorWindowController(stack: stack)
+            controller.editorDelegate = self
+            editor = controller
+            controller.present()
+        }
         restackThumbnails()
+        updateActivationPolicy()
     }
 
+    /// Sesión a la que corresponde un documento del editor.
+    private func session(forDocument id: UUID) -> CaptureSession? {
+        sessions.first { $0.document.id == id }
+    }
+
+    /// Cierra el editor y devuelve todas las capturas a sus miniaturas.
     @MainActor
-    private func returnToThumbnail(_ session: CaptureSession) {
-        session.editor?.hideWindow()
-        showThumbnail(for: session)
+    private func returnToThumbnails() {
+        editor?.hideWindow()
+        for session in sessions {
+            session.isBeingEdited = false
+            showThumbnail(for: session)
+        }
         updateActivationPolicy()
     }
 
@@ -179,7 +235,7 @@ final class AppCoordinator: NSObject {
 
     @MainActor
     private func copy(_ session: CaptureSession) {
-        session.editor?.flushPendingEdits()
+        editor?.flushPendingEdits()
         do {
             let image = try ImageExporter.compose(document: session.document)
             let limit = Preferences.shared.copySize.maximumSide
@@ -194,7 +250,7 @@ final class AppCoordinator: NSObject {
 
     @MainActor
     private func save(_ session: CaptureSession) {
-        session.editor?.flushPendingEdits()
+        editor?.flushPendingEdits()
 
         let image: CGImage
         do {
@@ -248,7 +304,7 @@ final class AppCoordinator: NSObject {
             }
         }
 
-        if let window = session.editor?.window, window.isVisible {
+        if let window = editor?.window, window.isVisible {
             panel.beginSheetModal(for: window, completionHandler: handler)
         } else {
             panel.begin(completionHandler: handler)
@@ -286,15 +342,21 @@ final class AppCoordinator: NSObject {
     func close(_ session: CaptureSession) {
         // Al cerrar se archiva la versión con anotaciones, que reemplaza a la original.
         archive(session)
-        session.editor?.hideWindow()
-        session.editor?.window?.close()
-        session.editor = nil
+        // Si estaba en el editor, se retira de la pila; cuando era la última, se cierra.
+        if session.isBeingEdited, let editor {
+            if !editor.removeFromStack(session.document.id) {
+                editor.hideWindow()
+                editor.window?.close()
+                self.editor = nil
+            }
+        }
         session.thumbnail?.close(animated: true)
         session.thumbnail = nil
         // El archivo que se haya arrastrado se deja donde está: quien lo recibió puede no
         // haberlo leído todavía. Caduca solo pasadas unas horas.
         sessions.removeAll { $0.id == session.id }
         restackThumbnails()
+        refreshThumbnailCounters()
         updateActivationPolicy()
     }
 
@@ -309,7 +371,7 @@ final class AppCoordinator: NSObject {
     /// lo ha pedido en los ajustes.
     func updateActivationPolicy() {
         let needsRegular = Preferences.shared.showsDockIcon
-            || sessions.contains { $0.isEditorVisible }
+            || editor?.window?.isVisible == true
             || PreferencesWindowController.isShowing
         let target: NSApplication.ActivationPolicy = needsRegular ? .regular : .accessory
         if NSApp.activationPolicy() != target {
@@ -376,9 +438,13 @@ extension AppCoordinator: ThumbnailWindowDelegate {
         Task { @MainActor in self.close(session) }
     }
 
-    func thumbnailFileURLForDragging(_ controller: ThumbnailWindowController) -> URL? {
-        guard let session = session(with: controller.sessionID) else { return nil }
+    func thumbnailFileURLsForDragging(_ controller: ThumbnailWindowController) -> [URL] {
+        // Se entregan todas las capturas del mazo, en el orden en que se tomaron.
+        sessions.filter { !$0.isBeingEdited }.compactMap(dragFileURL(for:))
+    }
 
+    /// Prepara —o reutiliza— el archivo que se arrastra para una captura.
+    private func dragFileURL(for session: CaptureSession) -> URL? {
         // Se reutiliza el archivo sólo si el documento entero sigue igual: las anotaciones y la
         // propia captura, que cambia al recortar.
         if let url = session.dragFileURL,
@@ -403,11 +469,14 @@ extension AppCoordinator: ThumbnailWindowDelegate {
 
     func thumbnailDidFinishDrag(_ controller: ThumbnailWindowController, accepted: Bool) {
         guard AppCoordinator.shouldDismissThumbnail(afterDragAccepted: accepted,
-                                                    preference: Preferences.shared.dismissesAfterDrag),
-              let session = session(with: controller.sessionID) else {
+                                                    preference: Preferences.shared.dismissesAfterDrag) else {
             return
         }
-        Task { @MainActor in self.close(session) }
+        // Se entregó el mazo entero, así que se retira entero.
+        let delivered = sessions.filter { !$0.isBeingEdited }
+        Task { @MainActor in
+            for session in delivered { self.close(session) }
+        }
     }
 
     /// Decide si la miniatura debe retirarse después de un arrastre.
@@ -436,22 +505,95 @@ extension AppCoordinator: ThumbnailWindowDelegate {
 extension AppCoordinator: EditorWindowDelegate {
 
     func editorRequestedCopy(_ controller: EditorWindowController) {
-        guard let session = session(with: controller.sessionID) else { return }
+        guard let session = session(forDocument: controller.stack.activeID) else { return }
         Task { @MainActor in self.copy(session) }
     }
 
     func editorRequestedSave(_ controller: EditorWindowController) {
-        guard let session = session(with: controller.sessionID) else { return }
+        guard let session = session(forDocument: controller.stack.activeID) else { return }
         Task { @MainActor in self.save(session) }
     }
 
+    /// Une todas las capturas en una sola imagen y la copia.
+    ///
+    /// Es lo útil para llevar varias pantallas de contexto a un chat de una vez, en lugar de
+    /// pegarlas de una en una.
+    func editorRequestedCopyAll(_ controller: EditorWindowController) {
+        controller.flushPendingEdits()
+        let documents = controller.stack.documents
+        Task { @MainActor in
+            do {
+                let image = try ImageExporter.combineVertically(documents.map { document in
+                    try ImageExporter.compose(document: document)
+                })
+                try ImageExporter.copyToPasteboard(image: image,
+                                                   maximumSide: Preferences.shared.copySize.maximumSide)
+                HUDPresenter.show("\(documents.count) capturas copiadas juntas",
+                                  symbol: "checkmark.circle.fill", on: NSScreen.main)
+                self.closeAll()
+            } catch {
+                self.report(error)
+            }
+        }
+    }
+
+    /// Guarda cada captura en su propio archivo.
+    func editorRequestedSaveAll(_ controller: EditorWindowController) {
+        controller.flushPendingEdits()
+        let preferences = Preferences.shared
+        let documents = controller.stack.documents
+
+        // Con guardado directo no hay nada que preguntar; si no, se pide la carpeta una vez.
+        let folder: URL?
+        if preferences.saveMode == .direct, preferences.saveFolderExists {
+            folder = preferences.saveFolder
+        } else {
+            folder = askForFolder()
+        }
+        guard let destination = folder else { return }
+
+        Task { @MainActor in
+            var written = 0
+            for document in documents {
+                do {
+                    let image = try ImageExporter.compose(document: document)
+                    let name = ImageExporter.suggestedFileName(for: document.capture.createdAt)
+                    let url = ImageExporter.availableURL(for: name, in: destination)
+                    try ImageExporter.write(image: image, to: url)
+                    written += 1
+                } catch {
+                    self.report(error)
+                    return
+                }
+            }
+            preferences.saveFolder = destination
+            HUDPresenter.show("\(written) capturas guardadas", symbol: "checkmark.circle.fill", on: NSScreen.main)
+            self.closeAll()
+        }
+    }
+
+    /// Panel para elegir la carpeta donde guardar todas las capturas.
+    private func askForFolder() -> URL? {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.canCreateDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.prompt = "Guardar aquí"
+        panel.message = "Elige dónde guardar todas las capturas"
+        if Preferences.shared.saveFolderExists {
+            panel.directoryURL = Preferences.shared.saveFolder
+        }
+        NSApp.activate(ignoringOtherApps: true)
+        return panel.runModal() == .OK ? panel.url : nil
+    }
+
     func editorRequestedReturnToThumbnail(_ controller: EditorWindowController) {
-        guard let session = session(with: controller.sessionID) else { return }
-        Task { @MainActor in self.returnToThumbnail(session) }
+        Task { @MainActor in self.returnToThumbnails() }
     }
 
     func editorRequestedDiscard(_ controller: EditorWindowController) {
-        guard let session = session(with: controller.sessionID) else { return }
+        guard let session = session(forDocument: controller.stack.activeID) else { return }
         Task { @MainActor in self.close(session) }
     }
 }

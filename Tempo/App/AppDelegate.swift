@@ -32,10 +32,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let opensEditor = CommandLine.arguments.contains("--editor")
             let annotated = CommandLine.arguments.contains("--annotated")
             let cropping = CommandLine.arguments.contains("--cropping")
+            // `--stack N` abre varias capturas de ejemplo apiladas.
+            let stackCount: Int? = CommandLine.arguments.firstIndex(of: "--stack").flatMap { index in
+                CommandLine.arguments.count > index + 1 ? Int(CommandLine.arguments[index + 1]) : 3
+            }
             DispatchQueue.main.async {
-                AppCoordinator.shared.presentDemoCapture(openingEditor: opensEditor,
-                                                         withSampleAnnotations: annotated,
-                                                         cropping: cropping)
+                if let stackCount {
+                    AppCoordinator.shared.presentDemoStack(count: stackCount, openingEditor: opensEditor)
+                } else {
+                    AppCoordinator.shared.presentDemoCapture(openingEditor: opensEditor,
+                                                             withSampleAnnotations: annotated,
+                                                             cropping: cropping)
+                }
             }
 
             // `--shot <ruta>`: se captura a sí misma pasado un momento, con sus ventanas ya en

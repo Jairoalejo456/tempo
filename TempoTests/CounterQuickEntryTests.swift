@@ -5,16 +5,20 @@ import XCTest
 final class CounterQuickEntryTests: XCTestCase {
 
     private var document: EditorDocument!
+    private var stack: EditorStack!
     private var entry: CounterQuickEntry!
 
     override func setUp() {
         super.setUp()
         document = EditorDocument(capture: TestSupport.makeCapture())
-        entry = CounterQuickEntry(document: document)
+        // El tecleo actúa sobre la captura activa de la pila, aunque aquí sólo haya una.
+        stack = EditorStack(documents: [document])
+        entry = CounterQuickEntry(stack: stack)
     }
 
     override func tearDown() {
         entry = nil
+        stack = nil
         document = nil
         super.tearDown()
     }

@@ -11,6 +11,10 @@ final class CanvasView: NSView {
     let document: EditorDocument
     private var cancellables: Set<AnyCancellable> = []
 
+    /// Se llama cuando el usuario toca este lienzo, para que la pila lo tome como activo.
+    var onActivate: (() -> Void)?
+
+
     /// Gesto en curso.
     private var gestureAnchor: CGPoint?
     private var isDrawing = false
@@ -487,6 +491,7 @@ final class CanvasView: NSView {
 
     override func mouseDown(with event: NSEvent) {
         window?.makeFirstResponder(self)
+        onActivate?()
 
         // Si había un texto en edición, un clic fuera lo confirma.
         if textEditor != nil {
@@ -716,8 +721,12 @@ final class CanvasView: NSView {
     /// espera en macOS) y el pellizco hace zoom.
     override func scrollWheel(with event: NSEvent) {
         let anchor = convert(event.locationInWindow, from: nil)
+        let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        // ⌃ y ⌘ fuerzan el zoom, que es el gesto de ampliación estándar de macOS; también
+        // convierte el desplazamiento del trackpad en zoom.
+        let forcesZoom = modifiers.contains(.control) || modifiers.contains(.command)
 
-        if event.hasPreciseScrollingDeltas {
+        if event.hasPreciseScrollingDeltas, !forcesZoom {
             panOffset.x += event.scrollingDeltaX
             panOffset.y += event.scrollingDeltaY
             clampPan()
@@ -726,7 +735,9 @@ final class CanvasView: NSView {
         }
 
         guard event.scrollingDeltaY != 0 else { return }
-        let step: CGFloat = event.scrollingDeltaY > 0 ? 1.12 : 1 / 1.12
+        // Con el trackpad los incrementos son mucho más finos que con la rueda.
+        let magnitude: CGFloat = event.hasPreciseScrollingDeltas ? 1.02 : 1.12
+        let step = event.scrollingDeltaY > 0 ? magnitude : 1 / magnitude
         setZoom(document.zoomFactor * step, anchorInView: anchor)
     }
 

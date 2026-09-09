@@ -5,8 +5,11 @@ protocol ThumbnailWindowDelegate: AnyObject {
     func thumbnailRequestedOpen(_ controller: ThumbnailWindowController)
     /// El botón de cerrar: descartar la captura.
     func thumbnailRequestedDismiss(_ controller: ThumbnailWindowController)
-    /// Se va a iniciar un arrastre: hay que materializar la imagen final en disco.
-    func thumbnailFileURLForDragging(_ controller: ThumbnailWindowController) -> URL?
+    /// Se va a iniciar un arrastre: hay que materializar en disco las imágenes finales.
+    ///
+    /// Devuelve una URL por captura del mazo, en orden, porque al arrastrar se entregan todas
+    /// y no sólo la que está encima.
+    func thumbnailFileURLsForDragging(_ controller: ThumbnailWindowController) -> [URL]
     /// El arrastre terminó copiando la imagen en otra aplicación.
     func thumbnailDidFinishDrag(_ controller: ThumbnailWindowController, accepted: Bool)
     /// Copiar la imagen sin pasar por el editor.
@@ -99,6 +102,12 @@ final class ThumbnailWindowController: NSWindowController {
         }
     }
 
+    /// Cuántas capturas hay en total. Cuando son varias, la miniatura se dibuja como un mazo:
+    /// las de detrás asoman por la esquina y un contador indica el total.
+    func updateStack(total: Int) {
+        thumbnailView.stackCount = total
+    }
+
     /// Refresca la imagen mostrada, por ejemplo tras anotar o recortar en el editor.
     ///
     /// El panel se redimensiona si la captura ha cambiado de proporción: recortar puede pasar
@@ -121,7 +130,7 @@ final class ThumbnailWindowController: NSWindowController {
     fileprivate func requestCopy() { delegate?.thumbnailRequestedCopy(self) }
     fileprivate func requestSave() { delegate?.thumbnailRequestedSave(self) }
     fileprivate func requestDismiss() { delegate?.thumbnailRequestedDismiss(self) }
-    fileprivate func fileURLForDragging() -> URL? { delegate?.thumbnailFileURLForDragging(self) }
+    fileprivate func fileURLsForDragging() -> [URL] { delegate?.thumbnailFileURLsForDragging(self) ?? [] }
     fileprivate func dragFinished(accepted: Bool) { delegate?.thumbnailDidFinishDrag(self, accepted: accepted) }
 
     /// Tamaño del panel para una captura dada. La proporción de la imagen se respeta siempre:
@@ -149,6 +158,11 @@ private final class ThumbnailView: NSView, NSDraggingSource {
 
     weak var controller: ThumbnailWindowController?
     var image: NSImage?
+
+    /// Número total de capturas vivas. Con más de una, la miniatura se dibuja como un mazo.
+    var stackCount = 1 {
+        didSet { needsDisplay = true }
+    }
 
     private var isHovered = false
     private var isDragging = false
@@ -191,8 +205,8 @@ private final class ThumbnailView: NSView, NSDraggingSource {
     // MARK: Clic y arrastre
 
     private var closeButtonRect: CGRect {
-        CGRect(x: closeButtonInset,
-               y: bounds.maxY - closeButtonInset - closeButtonRadius * 2,
+        CGRect(x: imageRect.minX + closeButtonInset,
+               y: imageRect.maxY - closeButtonInset - closeButtonRadius * 2,
                width: closeButtonRadius * 2,
                height: closeButtonRadius * 2)
     }
@@ -244,18 +258,26 @@ private final class ThumbnailView: NSView, NSDraggingSource {
     @objc private func menuDismiss() { controller?.requestDismiss() }
 
     private func beginImageDrag(with event: NSEvent) {
-        guard let url = controller?.fileURLForDragging() else {
+        let urls = controller?.fileURLsForDragging() ?? []
+        guard !urls.isEmpty else {
             isDragging = false
             return
         }
 
-        let item = NSDraggingItem(pasteboardWriter: url as NSURL)
-        let frame = imageRect
-        item.setDraggingFrame(frame, contents: image)
+        // Un elemento por captura: al soltar el mazo se entregan todas, no sólo la de encima.
+        // Los de detrás se colocan escalonados, como se ven en la miniatura.
+        let items: [NSDraggingItem] = urls.enumerated().map { index, url in
+            let item = NSDraggingItem(pasteboardWriter: url as NSURL)
+            let offset = CGFloat(min(index, maximumSheets)) * sheetOffset
+            let frame = imageRect.offsetBy(dx: offset, dy: -offset)
+            // Sólo la de delante lleva vista previa; las demás arrastran su icono de archivo.
+            item.setDraggingFrame(frame, contents: index == 0 ? image : nil)
+            return item
+        }
 
-        let session = beginDraggingSession(with: [item], event: event, source: self)
+        let session = beginDraggingSession(with: items, event: event, source: self)
         session.animatesToStartingPositionsOnCancelOrFail = true
-        session.draggingFormation = .none
+        session.draggingFormation = urls.count > 1 ? .stack : .none
     }
 
     func draggingSession(_ session: NSDraggingSession,
@@ -274,8 +296,21 @@ private final class ThumbnailView: NSView, NSDraggingSource {
 
     // MARK: Dibujo
 
+    /// Desplazamiento de cada hoja del mazo respecto a la de delante.
+    private let sheetOffset: CGFloat = 5
+    /// Cuántas hojas de detrás se llegan a dibujar, por muchas capturas que haya.
+    private let maximumSheets = 3
+
+    /// Hojas visibles por detrás de la de delante.
+    private var visibleSheets: Int {
+        min(max(stackCount - 1, 0), maximumSheets)
+    }
+
+    /// Rectángulo de la hoja de delante, que deja hueco a las de detrás.
     private var imageRect: CGRect {
-        bounds.insetBy(dx: 0, dy: 0)
+        let room = CGFloat(visibleSheets) * sheetOffset
+        return CGRect(x: bounds.minX, y: bounds.minY + room,
+                      width: bounds.width - room, height: bounds.height - room)
     }
 
     func playAppearAnimation() {
@@ -289,7 +324,27 @@ private final class ThumbnailView: NSView, NSDraggingSource {
     override func draw(_ dirtyRect: NSRect) {
         guard let context = NSGraphicsContext.current?.cgContext else { return }
 
-        let path = CGPath(roundedRect: bounds.insetBy(dx: 0.5, dy: 0.5),
+        // Hojas de detrás, de la más lejana a la más cercana: sólo se ve su esquina asomando,
+        // que es lo que da a entender que hay más capturas debajo.
+        for sheet in stride(from: visibleSheets, to: 0, by: -1) {
+            let inset = CGFloat(sheet) * sheetOffset
+            // Cada hoja se desplaza a la derecha y hacia abajo respecto a la de delante.
+            let sheetRect = imageRect.offsetBy(dx: inset, dy: -inset)
+            let path = CGPath(roundedRect: sheetRect.insetBy(dx: 0.5, dy: 0.5),
+                              cornerWidth: cornerRadius, cornerHeight: cornerRadius, transform: nil)
+            context.addPath(path)
+            // Cuanto más atrás, más apagada.
+            let tone = 0.42 - Double(sheet) * 0.06
+            context.setFillColor(NSColor(white: tone, alpha: 1).cgColor)
+            context.fillPath()
+            context.addPath(path)
+            context.setStrokeColor(NSColor.white.withAlphaComponent(0.30).cgColor)
+            context.setLineWidth(1)
+            context.strokePath()
+        }
+
+        let front = imageRect
+        let path = CGPath(roundedRect: front.insetBy(dx: 0.5, dy: 0.5),
                           cornerWidth: cornerRadius,
                           cornerHeight: cornerRadius,
                           transform: nil)
@@ -300,10 +355,11 @@ private final class ThumbnailView: NSView, NSDraggingSource {
 
         // Fondo por si la imagen tiene transparencia.
         context.setFillColor(NSColor.windowBackgroundColor.cgColor)
-        context.fill(bounds)
+        context.fill(front)
 
         if let image {
-            image.draw(in: bounds, from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: [.interpolation: NSImageInterpolation.high.rawValue])
+            image.draw(in: front, from: .zero, operation: .sourceOver, fraction: 1,
+                       respectFlipped: true, hints: [.interpolation: NSImageInterpolation.high.rawValue])
         }
         context.restoreGState()
 
@@ -313,9 +369,36 @@ private final class ThumbnailView: NSView, NSDraggingSource {
         context.setLineWidth(1)
         context.strokePath()
 
+        if stackCount > 1 {
+            drawCounter(in: context, frontRect: front)
+        }
+
         if isHovered {
             drawCloseButton(in: context)
         }
+    }
+
+    /// Contador con el total de capturas, en la esquina inferior derecha del mazo.
+    private func drawCounter(in context: CGContext, frontRect: CGRect) {
+        let text = NSAttributedString(string: "\(stackCount)", attributes: [
+            .font: NSFont.systemFont(ofSize: 11, weight: .bold),
+            .foregroundColor: NSColor.white
+        ])
+        let size = text.size()
+        let diameter = max(size.width + 12, 20)
+        let badge = CGRect(x: frontRect.maxX - diameter - 6,
+                           y: frontRect.minY + 6,
+                           width: diameter,
+                           height: 20)
+
+        context.setFillColor(NSColor.controlAccentColor.cgColor)
+        context.addPath(CGPath(roundedRect: badge, cornerWidth: 10, cornerHeight: 10, transform: nil))
+        context.fillPath()
+
+        let previous = NSGraphicsContext.current
+        NSGraphicsContext.current = NSGraphicsContext(cgContext: context, flipped: false)
+        text.draw(at: CGPoint(x: badge.midX - size.width / 2, y: badge.midY - size.height / 2))
+        NSGraphicsContext.current = previous
     }
 
     private func drawCloseButton(in context: CGContext) {

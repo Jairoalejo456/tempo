@@ -1,9 +1,14 @@
 import AppKit
+import Combine
 import SwiftUI
 
 protocol EditorWindowDelegate: AnyObject {
     func editorRequestedCopy(_ controller: EditorWindowController)
     func editorRequestedSave(_ controller: EditorWindowController)
+    /// Copiar todas las capturas unidas en una sola imagen.
+    func editorRequestedCopyAll(_ controller: EditorWindowController)
+    /// Guardar cada captura en su propio archivo.
+    func editorRequestedSaveAll(_ controller: EditorWindowController)
     /// Cerrar el editor conservando la captura como miniatura flotante.
     func editorRequestedReturnToThumbnail(_ controller: EditorWindowController)
     /// Descartar la captura por completo.
@@ -14,21 +19,33 @@ protocol EditorWindowDelegate: AnyObject {
 final class EditorWindowController: NSWindowController, NSWindowDelegate, NSMenuItemValidation {
 
     weak var editorDelegate: EditorWindowDelegate?
-    let editorDocument: EditorDocument
-    let sessionID: UUID
 
-    private let canvas: CanvasView
+    /// Capturas que se están editando. Puede ser una sola o varias apiladas.
+    let stack: EditorStack
+
+    /// Documento activo: sobre él actúan la barra, los atajos y las acciones de salida.
+    var editorDocument: EditorDocument { stack.active }
+
+    private var canvases: [UUID: CanvasView] = [:]
+    /// Contenedor donde se muestra el lienzo de la captura activa.
+    private var canvasHost: NSView?
+    private var sidebarView: NSView?
     private var keyMonitor: Any?
-    /// Renumeración de contadores tecleando, sin cuadros ni confirmación.
-    private lazy var counterEntry = CounterQuickEntry(document: editorDocument)
+    private var cancellables: Set<AnyCancellable> = []
 
-    init(sessionID: UUID, document: EditorDocument) {
-        self.sessionID = sessionID
-        self.editorDocument = document
-        self.canvas = CanvasView(document: document)
+    /// El lienzo de la captura activa.
+    private var canvas: CanvasView {
+        canvases[stack.activeID] ?? canvases.values.first!
+    }
+
+    /// Renumeración de contadores tecleando, sin cuadros ni confirmación.
+    private lazy var counterEntry = CounterQuickEntry(stack: stack)
+
+    init(stack: EditorStack) {
+        self.stack = stack
 
         let window = NSWindow(
-            contentRect: NSRect(origin: .zero, size: EditorWindowController.preferredContentSize(for: document)),
+            contentRect: NSRect(origin: .zero, size: EditorWindowController.preferredContentSize(for: stack)),
             styleMask: [.titled, .closable, .miniaturizable, .resizable],
             backing: .buffered,
             defer: false
@@ -64,21 +81,26 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSMenu
         let container = NSView()
 
         let toolbar = EditorToolbarView(
-            document: editorDocument,
+            stack: stack,
             onUndo: { [weak self] in self?.undoEdit(nil) },
             onRedo: { [weak self] in self?.redoEdit(nil) },
             onCopy: { [weak self] in self?.copyImage(nil) },
             onSave: { [weak self] in self?.saveImage(nil) },
+            onCopyAll: { [weak self] in self?.copyAllCombined(nil) },
+            onSaveAll: { [weak self] in self?.saveAllSeparately(nil) },
             onZoomIn: { [weak self] in self?.canvas.zoomIn() },
             onZoomOut: { [weak self] in self?.canvas.zoomOut() },
-            onZoomToFit: { [weak self] in self?.canvas.zoomToFit() }
+            onZoomToFit: { [weak self] in self?.canvas.zoomToFit() },
+            onSelect: { [weak self] id in self?.activate(id) }
         )
         let hosting = NSHostingView(rootView: toolbar)
         hosting.translatesAutoresizingMaskIntoConstraints = false
-        canvas.translatesAutoresizingMaskIntoConstraints = false
+
+        let content = makeEditingArea()
+        content.translatesAutoresizingMaskIntoConstraints = false
 
         container.addSubview(hosting)
-        container.addSubview(canvas)
+        container.addSubview(content)
 
         NSLayoutConstraint.activate([
             hosting.topAnchor.constraint(equalTo: container.topAnchor),
@@ -86,60 +108,129 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSMenu
             hosting.trailingAnchor.constraint(equalTo: container.trailingAnchor),
             hosting.heightAnchor.constraint(equalToConstant: EditorMetrics.toolbarHeight),
 
-            canvas.topAnchor.constraint(equalTo: hosting.bottomAnchor),
-            canvas.leadingAnchor.constraint(equalTo: container.leadingAnchor),
-            canvas.trailingAnchor.constraint(equalTo: container.trailingAnchor),
-            canvas.bottomAnchor.constraint(equalTo: container.bottomAnchor)
+            content.topAnchor.constraint(equalTo: hosting.bottomAnchor),
+            content.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+            content.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+            content.bottomAnchor.constraint(equalTo: container.bottomAnchor)
         ])
 
         return container
     }
 
-    /// Tamaño inicial: la captura a tamaño real si cabe, o ajustada a la pantalla.
-    private static func preferredContentSize(for document: EditorDocument) -> CGSize {
-        let image = document.capture.logicalSize
-        let toolbarHeight = EditorMetrics.toolbarHeight
-        let chrome: CGFloat = 60
-        let visible = (NSScreen.main?.visibleFrame.size) ?? CGSize(width: 1440, height: 900)
-        let maxWidth = visible.width * 0.9
-        let maxHeight = visible.height * 0.9 - chrome
+    /// Sólo se muestra la captura activa, ocupando todo el lienzo; las demás se eligen desde
+    /// la tira lateral de miniaturas.
+    ///
+    /// Cada captura conserva su propio lienzo aunque no esté visible, de modo que al volver a
+    /// ella siguen intactos su zoom, su desplazamiento y lo que tuviera seleccionado.
+    private func makeEditingArea() -> NSView {
+        let area = NSView()
 
-        let scale = min(maxWidth / image.width, (maxHeight - toolbarHeight) / image.height, 1)
-        return CGSize(width: max(940, (image.width * scale).rounded() + 32),
-                      height: max(320, (image.height * scale).rounded() + toolbarHeight + 32))
+        let host = NSView()
+        host.translatesAutoresizingMaskIntoConstraints = false
+        canvasHost = host
+
+        if stack.holdsSeveral {
+            let sidebar = NSHostingView(rootView: StackSidebar(stack: stack) { [weak self] id in
+                self?.activate(id)
+            })
+            sidebar.translatesAutoresizingMaskIntoConstraints = false
+            area.addSubview(sidebar)
+            area.addSubview(host)
+            // La tira va a la derecha: deja el lienzo pegado al borde izquierdo, que es por
+            // donde se empieza a mirar una captura.
+            NSLayoutConstraint.activate([
+                sidebar.topAnchor.constraint(equalTo: area.topAnchor),
+                sidebar.bottomAnchor.constraint(equalTo: area.bottomAnchor),
+                sidebar.trailingAnchor.constraint(equalTo: area.trailingAnchor),
+                sidebar.widthAnchor.constraint(equalToConstant: StackSidebar.width),
+
+                host.topAnchor.constraint(equalTo: area.topAnchor),
+                host.bottomAnchor.constraint(equalTo: area.bottomAnchor),
+                host.leadingAnchor.constraint(equalTo: area.leadingAnchor),
+                host.trailingAnchor.constraint(equalTo: sidebar.leadingAnchor)
+            ])
+            sidebarView = sidebar
+        } else {
+            area.addSubview(host)
+            NSLayoutConstraint.activate([
+                host.topAnchor.constraint(equalTo: area.topAnchor),
+                host.bottomAnchor.constraint(equalTo: area.bottomAnchor),
+                host.leadingAnchor.constraint(equalTo: area.leadingAnchor),
+                host.trailingAnchor.constraint(equalTo: area.trailingAnchor)
+            ])
+        }
+
+        showCanvas(for: stack.activeID)
+        return area
     }
 
-    // MARK: - Presentación
+    /// Pone en el lienzo la captura indicada, creando su vista la primera vez.
+    private func showCanvas(for id: UUID) {
+        guard let host = canvasHost, let document = stack.document(with: id) else { return }
+        let canvas = canvases[id] ?? makeCanvas(for: document)
+        guard canvas.superview !== host else { return }
 
-    func present() {
-        installKeyMonitorIfNeeded()
-        NSApp.setActivationPolicy(.regular)
-        NSApp.activate(ignoringOtherApps: true)
-        window?.makeKeyAndOrderFront(nil)
+        for existing in host.subviews { existing.removeFromSuperview() }
+        canvas.translatesAutoresizingMaskIntoConstraints = false
+        host.addSubview(canvas)
+        NSLayoutConstraint.activate([
+            canvas.topAnchor.constraint(equalTo: host.topAnchor),
+            canvas.bottomAnchor.constraint(equalTo: host.bottomAnchor),
+            canvas.leadingAnchor.constraint(equalTo: host.leadingAnchor),
+            canvas.trailingAnchor.constraint(equalTo: host.trailingAnchor)
+        ])
         window?.makeFirstResponder(canvas)
     }
 
-    func hideWindow() {
-        flushPendingEdits()
-        window?.orderOut(nil)
+    private func makeCanvas(for document: EditorDocument) -> CanvasView {
+        let canvas = CanvasView(document: document)
+        canvas.onActivate = { [weak self] in self?.activate(document.id) }
+        canvases[document.id] = canvas
+        return canvas
     }
 
-    /// Confirma cualquier texto o número a medio escribir antes de exportar.
-    func flushPendingEdits() {
-        counterEntry.finish()
-        canvas.commitTextEditor()
-        // La selección no debe salir dibujada en la imagen final.
-        editorDocument.select(nil)
+    /// Hace activa una captura y la trae al lienzo.
+    private func activate(_ id: UUID) {
+        guard stack.activeID != id else { return }
+        // Lo que se estuviera escribiendo en la captura anterior se confirma antes de dejarla.
+        canvases[stack.activeID]?.commitTextEditor()
+        stack.activate(id)
+        showCanvas(for: id)
     }
 
-    // MARK: - Acciones (también accesibles desde el menú principal)
-
-    @IBAction func copyImage(_ sender: Any?) {
-        editorDelegate?.editorRequestedCopy(self)
+    /// Quita del editor las capturas que ya no están en la pila.
+    private func rebuildStack() {
+        for (id, canvas) in canvases where stack.document(with: id) == nil {
+            canvas.removeFromSuperview()
+            canvases.removeValue(forKey: id)
+        }
+        showCanvas(for: stack.activeID)
     }
 
-    @IBAction func saveImage(_ sender: Any?) {
-        editorDelegate?.editorRequestedSave(self)
+
+    /// Rehace la pila cuando el coordinador ha añadido capturas nuevas.
+    func refreshAfterExternalChange() {
+        // La tira lateral aparece en cuanto hay más de una captura, así que la vista se
+        // reconstruye si acaba de dejar de haber una sola.
+        if stack.holdsSeveral, sidebarView == nil {
+            window?.contentView = makeContentView()
+        } else {
+            showCanvas(for: stack.activeID)
+        }
+    }
+
+    /// Activa una captura y la trae a la vista.
+    func focus(on id: UUID) {
+        activate(id)
+    }
+
+    /// Quita una captura de la pila tras copiarla o guardarla.
+    /// - Returns: `false` si era la última y la ventana debe cerrarse.
+    @discardableResult
+    func removeFromStack(_ id: UUID) -> Bool {
+        let survives = stack.remove(id)
+        if survives { rebuildStack() }
+        return survives
     }
 
     @IBAction func undoEdit(_ sender: Any?) {
@@ -189,6 +280,65 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSMenu
         }
     }
 
+    /// Tamaño inicial: la captura a tamaño real si cabe, o ajustada a la pantalla.
+    private static func preferredContentSize(for stack: EditorStack) -> CGSize {
+        // Con varias capturas la ventana nace más ancha: la tira lateral ocupa su sitio y la
+        // captura activa no debería quedarse estrecha por ello.
+        let sidebar = stack.holdsSeveral ? StackSidebar.width : 0
+        let image = stack.active.capture.logicalSize
+        let toolbarHeight = EditorMetrics.toolbarHeight
+        let chrome: CGFloat = 60
+        let visible = (NSScreen.main?.visibleFrame.size) ?? CGSize(width: 1440, height: 900)
+        let maxWidth = visible.width * 0.9
+        let maxHeight = visible.height * 0.9 - chrome
+
+        let scale = min(maxWidth / image.width, (maxHeight - toolbarHeight) / image.height, 1)
+        return CGSize(width: max(940, (image.width * scale).rounded() + 32 + sidebar),
+                      height: max(320, (image.height * scale).rounded() + toolbarHeight + 32))
+    }
+
+    // MARK: - Presentación
+
+    func present() {
+        installKeyMonitorIfNeeded()
+        NSApp.setActivationPolicy(.regular)
+        NSApp.activate(ignoringOtherApps: true)
+        window?.makeKeyAndOrderFront(nil)
+        window?.makeFirstResponder(canvas)
+    }
+
+    func hideWindow() {
+        flushPendingEdits()
+        window?.orderOut(nil)
+    }
+
+    /// Confirma cualquier texto o número a medio escribir antes de exportar.
+    func flushPendingEdits() {
+        counterEntry.finish()
+        canvas.commitTextEditor()
+        // La selección no debe salir dibujada en la imagen final.
+        editorDocument.select(nil)
+    }
+
+    // MARK: - Acciones sobre la captura activa
+
+    @IBAction func copyImage(_ sender: Any?) {
+        editorDelegate?.editorRequestedCopy(self)
+    }
+
+    @IBAction func saveImage(_ sender: Any?) {
+        editorDelegate?.editorRequestedSave(self)
+    }
+
+    @IBAction func copyAllCombined(_ sender: Any?) {
+        editorDelegate?.editorRequestedCopyAll(self)
+    }
+
+    @IBAction func saveAllSeparately(_ sender: Any?) {
+        editorDelegate?.editorRequestedSaveAll(self)
+    }
+
+
     // MARK: - Atajos de una sola tecla
 
     /// Se usa un monitor local en lugar de ítems de menú porque las teclas sin modificadores
@@ -224,6 +374,14 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSMenu
             } else {
                 editorDelegate?.editorRequestedReturnToThumbnail(self)
             }
+            return true
+        }
+
+        // ⌥↑ y ⌥↓ saltan entre capturas cuando hay varias apiladas.
+        if stack.holdsSeveral, modifiers == .option, event.keyCode == 126 || event.keyCode == 125 {
+            let index = stack.documents.firstIndex { $0.id == stack.activeID } ?? 0
+            let target = min(max(index + (event.keyCode == 126 ? -1 : 1), 0), stack.count - 1)
+            activate(stack.documents[target].id)
             return true
         }
 

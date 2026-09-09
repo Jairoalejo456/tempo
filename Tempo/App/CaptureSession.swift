@@ -12,7 +12,6 @@ final class CaptureSession {
     let screen: NSScreen?
 
     var thumbnail: ThumbnailWindowController?
-    var editor: EditorWindowController?
 
     /// Archivo temporal creado para arrastrar; se borra al cerrar la sesión.
     var dragFileURL: URL?
@@ -26,7 +25,6 @@ final class CaptureSession {
         self.screen = screen
     }
 
-    var isEditorVisible: Bool {
-        editor?.window?.isVisible == true
-    }
+    /// `true` mientras esta captura se está editando en la ventana del editor.
+    var isBeingEdited = false
 }

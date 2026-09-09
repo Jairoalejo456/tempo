@@ -50,8 +50,24 @@ Tempo vive en la barra de menús. Pulsa `⌥⇧⌘S` para capturar una región y
 5. Si cierras el editor sin descartar (⌘W o Esc), la captura **vuelve a ser miniatura** y
    sigue disponible para arrastrarla más tarde.
 
-Puedes tener varias capturas vivas a la vez: las miniaturas se apilan en la esquina. Y si una
-se retira antes de tiempo, sigue estando en **Capturas recientes**, en el menú de la barra.
+Y si una captura se retira antes de tiempo, sigue estando en **Capturas recientes**, en el menú
+de la barra.
+
+## Varias capturas a la vez
+
+Cuando tomas varias sin cerrarlas, se agrupan en un **mazo** en la esquina: se ve la de encima,
+las esquinas de las de detrás asomando y un contador con el total.
+
+- **Arrastrar el mazo entrega todas las capturas**, no sólo la de encima. Es lo cómodo para
+  llevar varias pantallas de contexto a un chat de una vez.
+- **Un clic** abre el editor con todas. A la derecha aparece una **tira de miniaturas** para
+  elegir sobre cuál trabajar; la captura elegida ocupa el lienzo entero.
+- Cada captura conserva **lo suyo**: sus anotaciones, su propio historial de deshacer, su zoom
+  y su numeración de contadores. Editar una nunca toca a las demás.
+- `⌥↑` y `⌥↓` saltan a la captura anterior o siguiente.
+- **Copiar** y **Guardar** actúan sobre la captura activa. El botón de al lado ofrece
+  **copiarlas todas juntas** en una sola imagen —apiladas verticalmente, ideal para pegar todo
+  el contexto de una vez— o **guardarlas por separado**, un archivo por captura.
 
 ---
 
@@ -162,7 +178,8 @@ arrastre también.
 | Seguir con la misma herramienta | `⌥` al soltar |
 | Eliminar lo seleccionado | `⌫` |
 | Quitar la selección | `Esc` |
-| Acercar / Alejar | `⌘+` / `⌘−` |
+| Captura anterior / siguiente | `⌥↑` / `⌥↓` |
+| Acercar / Alejar | `⌘+` / `⌘−` (o `⌃` + rueda) |
 | Ajustar a la ventana | `⌘0` |
 | Tamaño real | `⌘1` |
 | Deshacer / Rehacer | `⌘Z` / `⇧⌘Z` |
@@ -198,8 +215,8 @@ El editor abre siempre en modo **puntero** (`V`): mirar una captura y moverse po
 ensuciarla con una anotación accidental al primer clic. Con el puntero activo:
 
 - **Arrastrar** desplaza la captura.
-- **La rueda del ratón** acerca y aleja alrededor del cursor. Con trackpad, dos dedos desplazan
-  y el pellizco hace zoom.
+- **La rueda del ratón** acerca y aleja alrededor del cursor; con `⌃` pulsado, también. Con
+  trackpad, dos dedos desplazan y el pellizco hace zoom.
 - **Doble clic** vuelve a ajustar la captura a la ventana.
 
 El porcentaje de zoom se muestra en la barra; pulsarlo también reajusta.
@@ -387,6 +404,7 @@ Para probar el editor completo sin conceder ningún permiso, con una captura de 
 open -n /Applications/Tempo.app --args --demo                         # miniatura flotante
 open -n /Applications/Tempo.app --args --demo --editor                # y además el editor
 open -n /Applications/Tempo.app --args --demo --editor --annotated    # con anotaciones de ejemplo
+open -n /Applications/Tempo.app --args --demo --editor --stack 4      # cuatro capturas apiladas
 ```
 
 Para capturar la pantalla desde la propia aplicación (útil para revisar su interfaz, ya que
@@ -442,6 +460,7 @@ disponible.
 ## Limitaciones conocidas
 
 - No se pueden seleccionar varias anotaciones a la vez ni agruparlas.
+- Las capturas del mazo no se pueden reordenar.
 - No hay reconocimiento de texto (OCR) ni captura de una ventana concreta.
 - No hay capas: el orden de dibujo es el orden en que se crearon.
 - No hay captura de ventana concreta ni con retardo, ni captura con scroll.

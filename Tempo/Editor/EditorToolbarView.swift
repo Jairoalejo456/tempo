@@ -9,20 +9,59 @@ enum EditorMetrics {
     /// Alto de un botón de herramienta, incluida la letra de su atajo.
     static let toolButtonHeight: CGFloat = 38
     static let toolButtonWidth: CGFloat = 32
+    /// Separación entre capturas cuando se editan varias apiladas.
+    static let stackSpacing: CGFloat = 18
 }
 
 /// Barra de herramientas del editor: compacta, discreta y con los atajos siempre a la vista.
+///
+/// Observa la pila y, por separado, el documento activo: cambiar de captura cambia el objeto
+/// observado, y sin ese segundo nivel la barra seguiría describiendo la captura anterior.
 struct EditorToolbarView: View {
 
-    @ObservedObject var document: EditorDocument
+    @ObservedObject var stack: EditorStack
 
     var onUndo: () -> Void
     var onRedo: () -> Void
     var onCopy: () -> Void
     var onSave: () -> Void
+    var onCopyAll: () -> Void
+    var onSaveAll: () -> Void
     var onZoomIn: () -> Void
     var onZoomOut: () -> Void
     var onZoomToFit: () -> Void
+    var onSelect: (UUID) -> Void
+
+    var body: some View {
+        ToolbarContent(
+            document: stack.active,
+            stack: stack,
+            onUndo: onUndo, onRedo: onRedo,
+            onCopy: onCopy, onSave: onSave,
+            onCopyAll: onCopyAll, onSaveAll: onSaveAll,
+            onZoomIn: onZoomIn, onZoomOut: onZoomOut, onZoomToFit: onZoomToFit,
+            onSelect: onSelect
+        )
+        // Al cambiar de captura se reconstruye la barra con el documento nuevo.
+        .id(stack.activeID)
+    }
+}
+
+private struct ToolbarContent: View {
+
+    @ObservedObject var document: EditorDocument
+    @ObservedObject var stack: EditorStack
+
+    let onUndo: () -> Void
+    let onRedo: () -> Void
+    let onCopy: () -> Void
+    let onSave: () -> Void
+    let onCopyAll: () -> Void
+    let onSaveAll: () -> Void
+    let onZoomIn: () -> Void
+    let onZoomOut: () -> Void
+    let onZoomToFit: () -> Void
+    let onSelect: (UUID) -> Void
 
     @State private var showsShortcuts = false
 
@@ -74,6 +113,11 @@ struct EditorToolbarView: View {
 
             divider
             zoomGroup(showsButtons: density == .comfortable)
+
+            if stack.holdsSeveral {
+                divider
+                stackGroup
+            }
 
             Spacer(minLength: 10)
 
@@ -133,7 +177,7 @@ struct EditorToolbarView: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .help("Ajustar a la ventana · ⌘0. Acercar y alejar: ⌘+ / ⌘− o la rueda del ratón.")
+            .help("Ajustar a la ventana · ⌘0. Acercar y alejar: ⌘+ / ⌘−, la rueda del ratón, o ⌃ y la rueda.")
 
             if showsButtons {
                 ToolButton(symbol: "plus.magnifyingglass", shortcut: nil, isSelected: false,
@@ -255,6 +299,38 @@ struct EditorToolbarView: View {
         }
     }
 
+    /// Navegación entre las capturas apiladas: en qué posición estás y cómo saltar de una a
+    /// otra sin buscarla con la rueda.
+    private var stackGroup: some View {
+        HStack(spacing: 2) {
+            ToolButton(symbol: "chevron.up", shortcut: nil, isSelected: false,
+                       help: "Captura anterior · ⌥↑") { move(by: -1) }
+                .disabled(currentIndex == 0)
+                .opacity(currentIndex == 0 ? 0.35 : 1)
+
+            Text("\(currentIndex + 1)/\(stack.count)")
+                .font(.system(size: 11, weight: .medium, design: .rounded))
+                .monospacedDigit()
+                .foregroundStyle(.secondary)
+                .frame(width: 30)
+                .help("Captura \(currentIndex + 1) de \(stack.count)")
+
+            ToolButton(symbol: "chevron.down", shortcut: nil, isSelected: false,
+                       help: "Captura siguiente · ⌥↓") { move(by: 1) }
+                .disabled(currentIndex >= stack.count - 1)
+                .opacity(currentIndex >= stack.count - 1 ? 0.35 : 1)
+        }
+    }
+
+    private var currentIndex: Int {
+        stack.documents.firstIndex { $0.id == stack.activeID } ?? 0
+    }
+
+    private func move(by delta: Int) {
+        let target = min(max(currentIndex + delta, 0), stack.count - 1)
+        onSelect(stack.documents[target].id)
+    }
+
     /// Controles que sólo tienen sentido con una anotación seleccionada.
     @ViewBuilder
     private var selectionGroup: some View {
@@ -301,14 +377,37 @@ struct EditorToolbarView: View {
         }
     }
 
+    @ViewBuilder
     private func actionGroup(showsLabels: Bool) -> some View {
         HStack(spacing: 6) {
             ActionButton(symbol: "doc.on.doc", title: "Copiar", shortcut: "⌘C",
                          showsLabel: showsLabels,
-                         help: "Copiar la imagen con anotaciones · ⌘C", action: onCopy)
+                         help: stack.holdsSeveral
+                            ? "Copiar esta captura · ⌘C"
+                            : "Copiar la imagen con anotaciones · ⌘C",
+                         action: onCopy)
+
             ActionButton(symbol: "square.and.arrow.down", title: "Guardar", shortcut: "⌘S",
                          showsLabel: showsLabels,
-                         help: "Guardar como PNG · ⌘S", action: onSave)
+                         help: stack.holdsSeveral
+                            ? "Guardar esta captura · ⌘S"
+                            : "Guardar como PNG · ⌘S",
+                         action: onSave)
+
+            // Con varias capturas, un menú aparte para actuar sobre todas a la vez.
+            if stack.holdsSeveral {
+                Menu {
+                    Button("Copiar las \(stack.count) juntas en una imagen", action: onCopyAll)
+                    Button("Guardar las \(stack.count) por separado", action: onSaveAll)
+                } label: {
+                    Image(systemName: "square.stack.3d.down.right")
+                        .font(.system(size: 12, weight: .medium))
+                }
+                .menuStyle(.borderlessButton)
+                .menuIndicator(.hidden)
+                .frame(width: 26)
+                .help("Acciones sobre todas las capturas")
+            }
         }
     }
 
@@ -498,7 +597,11 @@ struct ShortcutsCheatSheet: View {
                 ("Ajustar a la ventana", "⌘0"),
                 ("Tamaño real", "⌘1"),
                 ("Con el puntero: mover", "arrastrar"),
-                ("Con el puntero: zoom", "rueda")
+                ("Con el puntero: zoom", "rueda  o  ⌃ + rueda")
+            ])
+            section("Varias capturas", rows: [
+                ("Elegir captura", "clic en la tira lateral"),
+                ("Anterior / siguiente", "⌥↑  /  ⌥↓")
             ])
             section("Salida", rows: [
                 ("Copiar con anotaciones", "⌘C"),
